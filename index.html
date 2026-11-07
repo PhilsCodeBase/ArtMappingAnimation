@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <!-- CSP: script-src enthaelt den sha256-Hash des Hauptskripts (das script-Element ohne Attribute). Nach jeder Aenderung daran neu berechnen, sonst startet die App nicht. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Y4Dops3Q8riPrUZdy1zkOajUNeWu14G0pZaNnXmpc/U='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src blob:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZB4XMHriSkEDyfbOeFK1VraVyiwg+l/u8oTSTXwpONw='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src blob:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ArtLoop Projection Studio</title>
 <meta name="description" content="Kunstwerke lebendig animieren und per Beamer projizieren – mit Mapping, Loop-Export und Syphon-Ausgang.">
@@ -161,6 +161,23 @@ select,input[type=number]{background:var(--panel2);border:1px solid var(--line);
       <div id="layers"></div>
       <div class="hint" style="margin:4px 0 0">Klick wählt ein Bild – Looks und Regler gelten für das gewählte. Oben liegt vorne.</div>
     </div>
+    <div class="box" id="formBox">
+      <h4>Form der Fläche</h4>
+      <div class="chips" id="shapeChips">
+        <span class="chip" data-shape="rect">Viereck</span><span class="chip" data-shape="ellipse">Kreis</span><span class="chip" data-shape="3">Dreieck</span><span class="chip" data-shape="5">Fünfeck</span><span class="chip" data-shape="6">Sechseck</span><span class="chip" data-shape="8">Achteck</span>
+      </div>
+      <div class="btnrow" id="formTools" style="margin:8px 0 0">
+        <button class="btn sm" id="bEditForm" title="Punkte der Form bearbeiten (Taste I wechselt)">Form bearbeiten</button>
+        <button class="btn sm" id="bEditImg" title="Bild unter der Form verschieben und verzerren (Taste I wechselt)">Bild bearbeiten</button>
+        <button class="btn sm" id="bCover" title="Bild so weit vergrößern, dass es die ganze Form abdeckt">Bild füllt Form</button>
+      </div>
+      <div class="hint" id="shapeHint" style="margin:6px 0 0"></div>
+      <h4 style="margin-top:12px;display:flex;justify-content:space-between;align-items:center">Überschneidung <button class="btn sm" id="bAddHole">+ Loch-Fläche</button></h4>
+      <div class="chips" id="cutChips">
+        <span class="chip" data-cut="none">Überdecken</span><span class="chip" data-cut="overlap">Überschneidung ausschneiden</span><span class="chip" data-cut="hole">Nur Loch</span>
+      </div>
+      <div class="hint" id="cutHint" style="margin:6px 0 0"></div>
+    </div>
     <div class="box" id="looks">
       <h4>Looks</h4>
       <div id="presets"></div>
@@ -192,7 +209,7 @@ select,input[type=number]{background:var(--panel2);border:1px solid var(--line);
 <div class="modal" id="mExport"><div class="card">
   <h3>Loop als Video exportieren</h3>
   <div class="f"><span>Inhalt</span><select id="exMode">
-    <option value="art">Nur gewähltes Bild (ohne Verzerrung)</option>
+    <option value="art">Nur gewähltes Bild (ohne Verzerrung und Form)</option>
     <option value="map1080">Beamerbild 1920×1080 mit Mapping</option>
     <option value="map2160">Beamerbild 3840×2160 mit Mapping</option>
   </select></div>
@@ -217,7 +234,7 @@ select,input[type=number]{background:var(--panel2);border:1px solid var(--line);
   </ol>
   <div class="hint" id="syHere"></div>
   <div class="f"><span>Inhalt</span><select id="syMode">
-    <option value="art">Gewähltes Bild (unverzerrt – Mapping in TouchDesigner)</option>
+    <option value="art">Gewähltes Bild (unverzerrt, ohne Form – Mapping in TouchDesigner)</option>
     <option value="map">Beamerbild mit allen Bildern und Mapping aus ArtLoop</option>
   </select></div>
   <div class="f"><span>Auflösung (lange Seite)</span><select id="syRes"><option value="1280">1280</option><option value="1920" selected>1920</option><option value="2560">2560</option></select></div>
@@ -327,11 +344,11 @@ const PRESET_GROUPS = {
 const FULL = ()=>[[0,0],[1,0],[1,1],[0,1]];
 let LAYER_ID=1;
 function newLayer(o){return Object.assign({id:LAYER_ID++,name:'Bild',p:{...DEF},corners:[[.1,.1],[.9,.1],[.9,.9],[.1,.9]],crop:FULL(),
-  img:null,imgData:null,isDemo:false,imgVersion:0,srcVersion:0,edgeVersion:0,rectW:1000,rectH:1000,visible:true,look:null},o||{});}
+  img:null,imgData:null,isDemo:false,imgVersion:0,srcVersion:0,edgeVersion:0,rectW:1000,rectH:1000,visible:true,look:null,shape:null,cut:'none'},o||{});}
 const S = {
   colors:{...DEF_COLORS}, swatches:[...DEF_SWATCHES], activeColor:'trC1',
   layers:[newLayer({name:'Beispielbild',isDemo:true})], sel:0, locked:false, loopLen:8, maxSize:1600,
-  grid:false, edgesView:false, black:false,
+  grid:false, edgesView:false, black:false, editImg:false,
   playing:true, t0:performance.now(), pausePhase:0,
   outAspect:16/9,
 };
@@ -378,6 +395,55 @@ function inv3(m){
 }
 function mapH(H,u,v){const w=H[6]*u+H[7]*v+H[8];return [(H[0]*u+H[1]*v+H[2])/w,(H[3]*u+H[4]*v+H[5])/w];}
 function hex3(h){const n=parseInt(h.slice(1),16);return [(n>>16&255)/255,(n>>8&255)/255,(n&255)/255];}
+
+/* ---------- Formen: Kreis und Vieleck ---------- */
+// l.shape = null (Viereck) oder {t:'ellipse'|'poly', pts:[[u,v],…]}. Die Punkte liegen im Bild-Koordinatensystem,
+// darum wandert die Form beim Verschieben, Skalieren und Drehen mit. Bei 'ellipse' sind es die 4 Ecken des umschließenden Vierecks.
+const MAX_FORM_PTS=64, ELLIPSE_SEGS=160;
+function shapeCtrlOut(l){const H=sq2quad(l.corners);return l.shape.pts.map(p=>mapH(H,p[0],p[1]));}
+function layerOutline(l){
+  if(!l.shape) return l.corners;
+  const o=shapeCtrlOut(l);
+  if(l.shape.t==='poly') return o;
+  const E=sq2quad(o), res=[];
+  for(let i=0;i<ELLIPSE_SEGS;i++){const a=i/ELLIPSE_SEGS*Math.PI*2;res.push(mapH(E,.5+.5*Math.cos(a),.5+.5*Math.sin(a)));}
+  return res;
+}
+// Neue Form mittig im Bild, im Beamerbild wirklich rund bzw. regelmäßig (nicht mit dem Bildformat verzerrt)
+function makeForm(l,kind){
+  const a=outAspect(), H=sq2quad(l.corners), I=inv3(H);
+  const P=(u,v)=>{const m=mapH(H,u,v);return [m[0]*a,m[1]];};
+  const c=P(.5,.5), r0=P(0,.5), r1=P(1,.5), s0=P(.5,0), s1=P(.5,1);
+  const eu=[r1[0]-r0[0],r1[1]-r0[1]], ev=[s1[0]-s0[0],s1[1]-s0[1]];
+  const lu=Math.hypot(eu[0],eu[1])||1e-6, lv=Math.hypot(ev[0],ev[1])||1e-6, r=Math.min(lu,lv)/2;
+  const ux=[eu[0]/lu,eu[1]/lu], sg=(-ux[1]*ev[0]+ux[0]*ev[1])<0?-1:1, vx=[-ux[1]*sg,ux[0]*sg];
+  const uv=(x,y)=>{const p=[c[0]+ux[0]*x+vx[0]*y,c[1]+ux[1]*x+vx[1]*y];return mapH(I,p[0]/a,p[1]);};
+  if(kind==='ellipse') return {t:'ellipse',pts:[uv(-r,-r),uv(r,-r),uv(r,r),uv(-r,r)]};
+  const pts=[]; for(let i=0;i<kind;i++){const w=-Math.PI/2+i/kind*Math.PI*2;pts.push(uv(r*Math.cos(w),r*Math.sin(w)));}
+  return {t:'poly',pts};
+}
+// Bild-Ecken ändern, die Form bleibt dabei an ihrer Stelle im Beamerbild
+function setKeepForm(l,n,form){
+  l.corners=n;
+  if(l.shape&&form){const I=inv3(sq2quad(n));l.shape.pts=form.map(p=>mapH(I,p[0],p[1]));}
+}
+function setFormOut(l,out){const I=inv3(sq2quad(l.corners));l.shape.pts=out.map(p=>mapH(I,p[0],p[1]));}
+function removeFormPoint(l,i){
+  if(l.shape.pts.length<=3){toast('Ein Vieleck braucht mindestens 3 Punkte.');return false;}
+  l.shape.pts.splice(i,1); refreshShapeUI(); saveLocal(); return true;
+}
+function addFormPoint(l,i,out){
+  if(l.shape.pts.length>=MAX_FORM_PTS){toast('Mehr als '+MAX_FORM_PTS+' Punkte gehen nicht.');return false;}
+  const I=inv3(sq2quad(l.corners)); l.shape.pts.splice(i,0,mapH(I,out[0],out[1])); refreshShapeUI(); saveLocal(); return true;
+}
+// Formen kommen auch aus Projektdateien, also vor der Verwendung prüfen.
+function cleanShape(s){
+  if(!s||(s.t!=='ellipse'&&s.t!=='poly')||!Array.isArray(s.pts)) return null;
+  const n=s.pts.length; if(s.t==='ellipse'?n!==4:(n<3||n>MAX_FORM_PTS)) return null;
+  const pts=s.pts.map(p=>Array.isArray(p)?[+p[0],+p[1]]:[NaN,NaN]);
+  return pts.every(p=>Number.isFinite(p[0])&&Number.isFinite(p[1])&&Math.abs(p[0])<1e3&&Math.abs(p[1])<1e3)?{t:s.t,pts}:null;
+}
+function cleanCut(c){return c==='overlap'||c==='hole'?c:'none';}
 
 /* ---------- Shader ---------- */
 const VS = `#version 300 es
@@ -617,7 +683,7 @@ void main(){
 
 const FS_DISP = `#version 300 es
 precision highp float;
-uniform sampler2D uTex; uniform mat3 uH; uniform vec2 uOut; uniform float uGrid; uniform float uBlack;
+uniform sampler2D uTex; uniform sampler2D uMask; uniform mat3 uH; uniform vec2 uOut; uniform float uGrid; uniform float uBlack; uniform float uMaskOn;
 out vec4 fo;
 void main(){
   vec2 q=gl_FragCoord.xy/uOut; q.y=1.0-q.y;
@@ -641,6 +707,7 @@ void main(){
       }
     }
   }
+  if(uMaskOn>0.5){float k=texture(uMask,q).a;col*=k;al*=k;}
   fo=vec4(col,al);
 }`;
 
@@ -686,7 +753,7 @@ class Renderer{
   draw(){this.gl.bindVertexArray(this.vao); this.gl.drawArrays(this.gl.TRIANGLES,0,3);}
   R(L){let r=this.res.get(L.id);if(!r){r={ver:{img:-1,src:-1,edge:-1},tSrc:null,tRect:null,tEdge:null,tAnim:null};this.res.set(L.id,r);}return r;}
   gc(){const ids=new Set(S.layers.map(l=>l.id));
-    for(const [id,r] of this.res) if(!ids.has(id)){if(r.tSrc)this.gl.deleteTexture(r.tSrc);this.free(r.tRect);this.free(r.tEdge);this.free(r.tAnim);this.res.delete(id);}}
+    for(const [id,r] of this.res) if(!ids.has(id)){if(r.tSrc)this.gl.deleteTexture(r.tSrc);if(r.tMask)this.gl.deleteTexture(r.tMask);this.free(r.tRect);this.free(r.tEdge);this.free(r.tAnim);this.res.delete(id);}}
   sync(L){
     const gl=this.gl; if(!L.img) return false; const r=this.R(L);
     if(r.ver.img!==L.imgVersion){
@@ -721,27 +788,70 @@ class Renderer{
     }
     return true;
   }
-  renderAnim(L,phase,view){
+  // Pro Fläche eine Maske in Ausgabegröße: eigene Form minus alles, was hier ausgeschnitten wird. Wird nur bei Änderungen neu gezeichnet.
+  updateMasks(list,W,H,cuts){
+    const sig=JSON.stringify([W,H,list.map(l=>[l.id,l.cut,l.shape,l.corners,l.shape?l.p.feather:0])]);
+    if(sig===this.maskSig) return;
+    this.maskSig=sig;
+    const cv=this.maskCv||(this.maskCv=document.createElement('canvas'));
+    if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H;}
+    const g=cv.getContext('2d'), gl=this.gl;
+    const trace=l=>{g.beginPath();layerOutline(l).forEach(p=>g.lineTo(p[0]*W,p[1]*H));g.closePath();};
+    g.lineJoin='round';
+    for(const l of list){
+      if(l.cut==='hole'||!(cuts||l.shape)) continue;
+      g.globalCompositeOperation='source-over'; g.globalAlpha=1; g.clearRect(0,0,W,H);
+      g.fillStyle='#fff'; trace(l); g.fill();
+      g.globalCompositeOperation='destination-out';
+      if(l.shape&&l.p.feather>0){ // „Ränder weich“ folgt der Form statt dem Bild-Viereck
+        const o=layerOutline(l), xs=o.map(p=>p[0]*W), ys=o.map(p=>p[1]*H);
+        const size=Math.min(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys)), N=12;
+        g.strokeStyle='#000'; trace(l);
+        for(let k=N;k>=1;k--){g.globalAlpha=1/k;g.lineWidth=2*l.p.feather*size*k/N;g.stroke();}
+        g.globalAlpha=1;
+      }
+      g.fillStyle='#000';
+      for(const o of list) if(o!==l&&(o.cut!=='none'||l.cut==='overlap')){trace(o);g.fill();}
+      const r=this.R(l);
+      if(!r.tMask){
+        r.tMask=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,r.tMask);
+        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+      } else gl.bindTexture(gl.TEXTURE_2D,r.tMask);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,cv);
+    }
+  }
+  renderAnim(L,phase,view,noFeather){
     const P=L.p,r=this.R(L),pr=this.pA,A=r.tAnim,gl=this.gl;
     this.pass(pr,A,A.w,A.h); this.bind(0,r.tRect); this.bind(1,r.tEdge);
     this.ui(pr,'uImg',0); this.ui(pr,'uEdge',1); this.ui(pr,'uView',view?1:0);
     this.u(pr,'uRes',A.w,A.h); this.u(pr,'uSrcRes',L.rectW,L.rectH); this.u(pr,'uTh',phase*Math.PI*2*(P.tempo||1));
     const U=uniformsFrom(P); for(const k in U) this.u(pr,k,+U[k]);
+    if(noFeather) this.u(pr,'uFeather',0);
     this.u(pr,'uPuC',P.puX,P.puY);
     const C=S.colors; this.u(pr,'uTrC1',...hex3(C.trC1)); this.u(pr,'uTrC2',...hex3(C.trC2)); this.u(pr,'uLiCol',...hex3(C.liCol));
     this.draw(); this.bind(0,A); gl.generateMipmap(gl.TEXTURE_2D);
   }
-  // o.layers: welche Bilder (Standard: alle sichtbaren), o.corners: feste Ecken für alle (z. B. Export „nur Kunstwerk“)
+  // o.layers: welche Bilder (Standard: alle sichtbaren), o.corners: feste Ecken für alle (z. B. Export „nur Kunstwerk“, dann ohne Form und Ausschnitte)
   render(phase,o){
     const gl=this.gl, W=this.c.width, H=this.c.height;
     this.gc();
     const list=(o.layers||S.layers).filter(l=>l.visible!==false&&l.img), ok=[];
-    if(!o.black) for(const l of list){ if(this.sync(l)){ this.renderAnim(l,phase,o.view); ok.push(l);} }
+    const mapped=!o.corners;
+    if(!o.black) for(const l of list){
+      if(mapped&&l.cut==='hole') continue; // Loch-Flächen zeigen nie ihr Bild
+      if(this.sync(l)){ this.renderAnim(l,phase,o.view,mapped&&!!l.shape); ok.push(l);}
+    }
     gl.bindFramebuffer(gl.FRAMEBUFFER,null); gl.viewport(0,0,W,H); gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT);
     if(!ok.length) return;
+    const cuts=mapped&&list.some(l=>l.cut!=='none');
+    if(cuts||(mapped&&list.some(l=>l.shape))) this.updateMasks(list,W,H,cuts);
     const pr=this.pD; gl.useProgram(pr); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);
     for(const l of ok){
-      this.bind(0,this.R(l).tAnim); this.ui(pr,'uTex',0);
+      const rs=this.R(l), mk=mapped&&(cuts||!!l.shape)&&rs.tMask;
+      this.bind(0,rs.tAnim); this.ui(pr,'uTex',0); this.ui(pr,'uMask',1); this.u(pr,'uMaskOn',mk?1:0);
+      if(mk) this.bind(1,rs.tMask);
       this.um(pr,'uH',inv3(sq2quad(o.corners||l.corners))); this.u(pr,'uOut',W,H);
       this.u(pr,'uGrid',o.grid?1:0); this.u(pr,'uBlack',0); this.draw();
     }
@@ -750,33 +860,45 @@ class Renderer{
 }
 
 /* ---------- Ecken-Editor (funktioniert in jedem Fenster) ---------- */
+// Griffe sind je nach Modus die Bild-Ecken oder die Punkte der Form (S.editImg schaltet um).
 class CornerEditor{
   constructor(canvas,opt){
     this.c=canvas; this.o=opt; this.sel=-1; this.drag=null; this.enabled=true; this.locked=false;
     const ev=(n,f,o)=>canvas.addEventListener(n,f,o);
     ev('pointerdown',e=>this.down(e)); ev('pointermove',e=>this.move(e)); ev('pointerup',e=>this.up(e)); ev('pointercancel',e=>this.up(e));
-    ev('wheel',e=>this.wheel(e),{passive:false});
+    ev('wheel',e=>this.wheel(e),{passive:false}); ev('dblclick',e=>this.dbl(e));
   }
   dpr(){return this.c.width/Math.max(1,this.c.clientWidth);}
   pt(e){const r=this.c.getBoundingClientRect(),d=this.dpr();return [(e.clientX-r.left)*d,(e.clientY-r.top)*d];}
   fr(){return this.o.frame?this.o.frame():{x:0,y:0,w:this.c.width,h:this.c.height};}
   px(c){const f=this.fr();return [f.x+c[0]*f.w,f.y+c[1]*f.h];}
-  inside(p,q){let ins=false;for(let i=0,j=3;i<4;j=i++){const a=q[i],b=q[j];
+  lay(){return this.o.layer?this.o.layer():null;}
+  formOn(){const l=this.lay();return !!(l&&l.shape&&!S.editImg);}
+  keepForm(){const l=this.lay();return !!(l&&l.shape&&S.editImg);}
+  handles(){return this.formOn()?shapeCtrlOut(this.lay()):this.o.get();}
+  body(){const l=this.lay();return (l?layerOutline(l):this.o.get()).map(c=>this.px(c));}
+  inside(p,q){let ins=false;for(let i=0,j=q.length-1;i<q.length;j=i++){const a=q[i],b=q[j];
     if(((a[1]>p[1])!==(b[1]>p[1]))&&(p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])) ins=!ins;} return ins;}
   pickAt(p){
     if(!this.o.others) return false;
     const list=this.o.others();
-    for(let i=list.length-1;i>=0;i--){ if(this.inside(p,list[i].corners.map(c=>this.px(c)))){ this.o.pick(list[i].idx); this.sel=-1; return true; } }
+    for(let i=list.length-1;i>=0;i--){ if(this.inside(p,list[i].outline.map(c=>this.px(c)))){ this.o.pick(list[i].idx); this.sel=-1; return true; } }
     return false;
+  }
+  grab(type,i,p){
+    const l=this.lay();
+    this.drag={type,i,start:p,orig:this.o.get().map(c=>c.slice()),hs:this.handles().map(c=>c.slice()),form:l&&l.shape?shapeCtrlOut(l):null};
   }
   down(e){
     if(!this.enabled) return;
-    const p=this.pt(e), q=this.o.get().map(c=>this.px(c)), r=18*this.dpr();
-    if(this.locked){ if(!this.inside(p,q)) this.pickAt(p); return; }
-    let best=-1,bd=1e9; q.forEach((c,i)=>{const d=Math.hypot(c[0]-p[0],c[1]-p[1]); if(d<bd){bd=d;best=i;}});
-    if(bd<r){this.sel=best;this.drag={type:'corner',i:best,start:p,orig:this.o.get().map(c=>c.slice())};}
-    else if(this.inside(p,q)){this.drag={type:'move',start:p,orig:this.o.get().map(c=>c.slice())};}
-    else if(this.pickAt(p)){this.drag={type:'move',start:p,orig:this.o.get().map(c=>c.slice())};}
+    const p=this.pt(e), r=18*this.dpr();
+    if(this.locked){ if(!this.inside(p,this.body())) this.pickAt(p); return; }
+    const q=this.o.get().map(c=>this.px(c)), hs=this.handles().map(c=>this.px(c));
+    let best=-1,bd=1e9; hs.forEach((c,i)=>{const d=Math.hypot(c[0]-p[0],c[1]-p[1]); if(d<bd){bd=d;best=i;}});
+    if(bd<r){this.sel=best;this.grab(this.formOn()?'form':'corner',best,p);}
+    else if(this.inside(p,this.formOn()?this.body():q)){this.grab('move',-1,p);}
+    else if(this.pickAt(p)){this.grab('move',-1,p);}
+    else if(this.inside(p,q)){this.grab('move',-1,p);}
     else {this.sel=-1;this.drag=null;}
     if(this.drag){this.c.setPointerCapture(e.pointerId);e.preventDefault();}
     this.o.onChange && this.o.onChange(false);
@@ -785,67 +907,109 @@ class CornerEditor{
     if(!this.drag){ // cursor
       if(!this.enabled) return;
       if(this.locked){this.c.style.cursor='default';return;}
-      const p=this.pt(e),q=this.o.get().map(c=>this.px(c)),r=18*this.dpr();
-      const near=q.some(c=>Math.hypot(c[0]-p[0],c[1]-p[1])<r);
-      this.c.style.cursor=near?'grab':(this.inside(p,q)?'move':'default'); return;
+      const p=this.pt(e),r=18*this.dpr();
+      const near=this.handles().some(c=>{const m=this.px(c);return Math.hypot(m[0]-p[0],m[1]-p[1])<r;});
+      const q=this.o.get().map(c=>this.px(c));
+      this.c.style.cursor=near?'grab':(this.inside(p,q)||this.inside(p,this.body())?'move':'default'); return;
     }
     const f=this.fr(),p=this.pt(e),dx=(p[0]-this.drag.start[0])/f.w,dy=(p[1]-this.drag.start[1])/f.h;
-    const n=this.drag.orig.map(c=>c.slice());
-    if(this.drag.type==='corner'){n[this.drag.i][0]+=dx;n[this.drag.i][1]+=dy;} else n.forEach(c=>{c[0]+=dx;c[1]+=dy;});
-    this.o.set(n); this.o.onChange && this.o.onChange(true);
+    if(this.drag.type==='form'){
+      const q=this.drag.hs.map(c=>c.slice()); q[this.drag.i][0]+=dx; q[this.drag.i][1]+=dy;
+      this.o.setForm(q);
+    } else {
+      const n=this.drag.orig.map(c=>c.slice());
+      if(this.drag.type==='corner'){n[this.drag.i][0]+=dx;n[this.drag.i][1]+=dy;} else n.forEach(c=>{c[0]+=dx;c[1]+=dy;});
+      if(this.keepForm()) this.o.setKeep(n,this.drag.form); else this.o.set(n);
+    }
+    this.o.onChange && this.o.onChange(true);
   }
   up(){if(this.drag){this.drag=null;this.o.onChange && this.o.onChange(true,true);}}
   wheel(e){
     if(!this.enabled||this.locked) return; e.preventDefault();
-    const q=this.o.get(), F=this.fr(), W=F.w,H=F.h;
+    const q=this.o.get(), F=this.fr(), W=F.w,H=F.h, l=this.lay();
     const cx=q.reduce((s,c)=>s+c[0],0)/4*W, cy=q.reduce((s,c)=>s+c[1],0)/4*H;
     let n;
     if(e.altKey){const a=(e.deltaY<0?-1:1)*0.25*Math.PI/180*(e.shiftKey?8:1),ca=Math.cos(a),sa=Math.sin(a);
       n=q.map(c=>{const x=c[0]*W-cx,y=c[1]*H-cy;return [(cx+x*ca-y*sa)/W,(cy+x*sa+y*ca)/H];});}
     else {const f=e.deltaY<0?1+(e.shiftKey?.05:.01):1/(1+(e.shiftKey?.05:.01));
       n=q.map(c=>[(cx+(c[0]*W-cx)*f)/W,(cy+(c[1]*H-cy)*f)/H]);}
-    this.o.set(n); this.o.onChange && this.o.onChange(true,true);
+    if(this.keepForm()) this.o.setKeep(n,shapeCtrlOut(l)); else this.o.set(n);
+    this.o.onChange && this.o.onChange(true,true);
+  }
+  // Doppelklick im Form-Modus: auf einen Punkt = entfernen, auf eine Kante = neuer Punkt
+  dbl(e){
+    if(!this.enabled||this.locked||!this.formOn()) return;
+    const l=this.lay(); if(l.shape.t!=='poly') return;
+    const p=this.pt(e), r=18*this.dpr(), hs=this.handles().map(c=>this.px(c));
+    const hit=hs.findIndex(c=>Math.hypot(c[0]-p[0],c[1]-p[1])<r);
+    if(hit>=0){ if(removeFormPoint(l,hit)) this.sel=-1; e.preventDefault(); return; }
+    let best=-1,bd=r,bt=0;
+    hs.forEach((a,i)=>{const b=hs[(i+1)%hs.length],vx=b[0]-a[0],vy=b[1]-a[1],t=Math.min(1,Math.max(0,((p[0]-a[0])*vx+(p[1]-a[1])*vy)/((vx*vx+vy*vy)||1)));
+      const d=Math.hypot(a[0]+vx*t-p[0],a[1]+vy*t-p[1]); if(d<bd){bd=d;best=i;bt=t;}});
+    if(best<0) return;
+    const o=shapeCtrlOut(l), a=o[best], b=o[(best+1)%o.length];
+    if(addFormPoint(l,best+1,[a[0]+(b[0]-a[0])*bt,a[1]+(b[1]-a[1])*bt])) this.sel=best+1;
+    e.preventDefault();
   }
   key(e){
     if(!this.enabled||this.locked) return false;
-    const k=e.key, st=(e.shiftKey?10:1);
-    if(k==='Tab'){this.sel=(this.sel+(e.shiftKey?3:1))%4; if(this.sel<0)this.sel=0; return true;}
+    const k=e.key, st=(e.shiftKey?10:1), hs=this.handles(), cnt=hs.length, l=this.lay();
+    if(k==='Tab'){this.sel=(this.sel+(e.shiftKey?cnt-1:1))%cnt; if(this.sel<0)this.sel=0; return true;}
     if(k==='Escape'){this.sel=-1;return true;}
+    if((k==='Delete'||k==='Backspace')&&this.formOn()&&this.sel>=0&&l.shape.t==='poly'){ if(removeFormPoint(l,this.sel)) this.sel=-1; return true; }
     const d={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[k]; if(!d) return false;
-    const n=this.o.get().map(c=>c.slice()), refW=this.o.refW?this.o.refW():this.c.width, refH=this.o.refH?this.o.refH():this.c.height;
-    const mv=c=>{c[0]+=d[0]*st/refW;c[1]+=d[1]*st/refH;};
-    if(this.sel>=0) mv(n[this.sel]); else n.forEach(mv);
-    this.o.set(n); this.o.onChange && this.o.onChange(true,true); return true;
+    const refW=this.o.refW?this.o.refW():this.c.width, refH=this.o.refH?this.o.refH():this.c.height;
+    const mv=c=>{c[0]+=d[0]*st/refW;c[1]+=d[1]*st/refH;}, hasSel=this.sel>=0&&this.sel<cnt;
+    if(this.formOn()&&hasSel){ const q=hs.map(c=>c.slice()); mv(q[this.sel]); this.o.setForm(q); }
+    else{
+      const n=this.o.get().map(c=>c.slice());
+      if(hasSel) mv(n[this.sel]); else n.forEach(mv);
+      if(this.keepForm()) this.o.setKeep(n,shapeCtrlOut(l)); else this.o.set(n);
+    }
+    this.o.onChange && this.o.onChange(true,true); return true;
   }
   draw(){
     const g=this.c.getContext('2d'),d=this.dpr(),F=this.fr();
     g.clearRect(0,0,this.c.width,this.c.height);
     if(this.o.bg) this.o.bg(g,F);
     if(!this.enabled) return;
+    const path=pts=>{g.beginPath(); pts.forEach(p=>g.lineTo(p[0],p[1])); g.closePath();};
+    const holeFill=pts=>{path(pts); g.fillStyle='rgba(255,90,80,.18)'; g.fill();};
     g.font=`${11*d}px system-ui`; g.textAlign='left'; g.textBaseline='bottom';
     if(this.o.others) for(const ot of this.o.others()){ // andere Bilder: gestrichelt, Klick wählt sie aus
-      const op=ot.corners.map(c=>this.px(c)); g.setLineDash([5*d,4*d]); g.strokeStyle='rgba(255,255,255,.4)'; g.lineWidth=1*d;
-      g.beginPath(); op.forEach(p=>g.lineTo(p[0],p[1])); g.closePath(); g.stroke(); g.setLineDash([]);
+      const op=ot.outline.map(c=>this.px(c)); if(ot.hole) holeFill(op);
+      g.setLineDash([5*d,4*d]); g.strokeStyle=ot.hole?'rgba(255,120,110,.8)':'rgba(255,255,255,.4)'; g.lineWidth=1*d;
+      path(op); g.stroke(); g.setLineDash([]);
       g.fillStyle='rgba(255,255,255,.55)'; g.fillText(ot.name,op[0][0]+4*d,op[0][1]-3*d);
     }
-    const q=this.o.get(), qp=q.map(c=>this.px(c)), Hm=sq2quad(q), col=this.locked?'#ffb547':(this.o.color||'#3ff0ff');
-    if(this.o.label){g.fillStyle=col; g.fillText(this.o.label(),qp[0][0]+4*d,qp[0][1]-3*d);}
-    if(this.locked){ g.strokeStyle=col; g.lineWidth=1*d; g.beginPath(); qp.forEach(p=>g.lineTo(p[0],p[1])); g.closePath(); g.stroke();
-      g.fillStyle=col; g.fillText('🔒',qp[2][0]-16*d,qp[2][1]-3*d); return; }
+    const l=this.lay(), q=this.o.get(), qp=q.map(c=>this.px(c)), Hm=sq2quad(q), col=this.locked?'#ffb547':(this.o.color||'#3ff0ff');
+    const body=this.body(), hasForm=!!(l&&l.shape), formOn=this.formOn();
+    if(l&&l.cut==='hole') holeFill(body);
+    if(this.o.label){g.fillStyle=col; g.fillText(this.o.label(),body[0][0]+4*d,body[0][1]-3*d);}
+    if(this.locked){ g.strokeStyle=col; g.lineWidth=1*d; path(body); g.stroke();
+      const m=body[Math.floor(body.length/2)]; g.fillStyle=col; g.fillText('🔒',m[0]-16*d,m[1]-3*d); return; }
     const P=(u,v)=>this.px(mapH(Hm,u,v));
-    g.lineWidth=1*d; g.strokeStyle='rgba(255,255,255,.25)';
-    for(let i=1;i<4;i++){
-      g.beginPath(); for(let k=0;k<=20;k++){const m=P(i/4,k/20);g.lineTo(m[0],m[1]);} g.stroke();
-      g.beginPath(); for(let k=0;k<=20;k++){const m=P(k/20,i/4);g.lineTo(m[0],m[1]);} g.stroke();
+    if(!formOn){
+      g.lineWidth=1*d; g.strokeStyle='rgba(255,255,255,.25)';
+      for(let i=1;i<4;i++){
+        g.beginPath(); for(let k=0;k<=20;k++){const m=P(i/4,k/20);g.lineTo(m[0],m[1]);} g.stroke();
+        g.beginPath(); for(let k=0;k<=20;k++){const m=P(k/20,i/4);g.lineTo(m[0],m[1]);} g.stroke();
+      }
     }
-    g.strokeStyle=col; g.lineWidth=1.5*d; g.beginPath(); qp.forEach(p=>g.lineTo(p[0],p[1])); g.closePath(); g.stroke();
-    const labels=['1','2','3','4'];
-    qp.forEach((p,i)=>{
+    if(formOn){ // Bild-Rahmen dezent, die Form ist hier das Werkzeug
+      g.setLineDash([4*d,4*d]); g.strokeStyle='rgba(255,255,255,.3)'; g.lineWidth=1*d; path(qp); g.stroke();
+      if(l.shape.t==='ellipse'){ path(shapeCtrlOut(l).map(c=>this.px(c))); g.stroke(); }
+      g.setLineDash([]);
+    }
+    if(hasForm&&!formOn){ g.strokeStyle='rgba(255,255,255,.85)'; g.lineWidth=1.5*d; path(body); g.stroke(); }
+    g.strokeStyle=col; g.lineWidth=1.5*d; path(formOn?body:qp); g.stroke();
+    const hs=this.handles().map(c=>this.px(c));
+    hs.forEach((p,i)=>{
       g.beginPath(); g.arc(p[0],p[1],(i===this.sel?10:8)*d,0,Math.PI*2);
       g.fillStyle=i===this.sel?col:'rgba(0,0,0,.6)'; g.fill(); g.strokeStyle=col; g.lineWidth=2*d; g.stroke();
-      g.fillStyle=i===this.sel?'#000':col; g.font=`${10*d}px system-ui`; g.textAlign='center'; g.textBaseline='middle'; g.fillText(labels[i],p[0],p[1]+.5);
+      g.fillStyle=i===this.sel?'#000':col; g.font=`${10*d}px system-ui`; g.textAlign='center'; g.textBaseline='middle'; g.fillText(String(i+1),p[0],p[1]+.5);
     });
-    const ctr=P(.5,.5); g.strokeStyle=col; g.lineWidth=1*d;
+    const ctr=formOn?hs.reduce((s,p)=>[s[0]+p[0]/hs.length,s[1]+p[1]/hs.length],[0,0]):P(.5,.5); g.strokeStyle=col; g.lineWidth=1*d;
     g.beginPath(); g.moveTo(ctr[0]-8*d,ctr[1]); g.lineTo(ctr[0]+8*d,ctr[1]); g.moveTo(ctr[0],ctr[1]-8*d); g.lineTo(ctr[0],ctr[1]+8*d); g.stroke();
   }
 }
@@ -939,7 +1103,7 @@ function refreshInputs(){
     const v=k==='loop'?S.loopLen:S.p[k];
     it.inp.value=v; it.val.textContent=fmtVal(it.r,v);
   }
-  refreshDim(); renderSwatches();
+  refreshDim(); renderSwatches(); refreshShapeUI();
 }
 function setParam(k,v,updateInput){
   if(k==='loop'){const ph=phaseNow();S.loopLen=v;if(S.playing)S.t0=performance.now()-ph*v*1000;}
@@ -1036,7 +1200,7 @@ function selectLayer(i){
   refreshInputs(); markLook(); renderLayers(); updateInfo(); saveLocal();
 }
 function addLayer(c,data,name){
-  const onlyDemo=S.layers.length===1&&S.layers[0].isDemo;
+  const onlyDemo=S.layers.length===1&&S.layers[0].isDemo&&S.layers[0].cut!=='hole';
   if(onlyDemo){ S.sel=0; L().name=name; setImage(c,data,false,false); fitCorners(.8); }
   else{
     const nl=newLayer({name,p:{...S.p},look:S.look}); S.layers.push(nl); S.sel=S.layers.length-1;
@@ -1045,6 +1209,14 @@ function addLayer(c,data,name){
     else fitCorners(.45);
   }
   persistImage(L()); renderLayers(); refreshInputs(); markLook(); saveLocal();
+}
+function addHole(){
+  if(guardLock()) return;
+  const n=S.layers.filter(l=>l.cut==='hole').length+1, nl=newLayer({name:'Loch '+n,cut:'hole'});
+  S.layers.push(nl); S.sel=S.layers.length-1;
+  setLayerImage(nl,demoArt(),null,true,false);
+  const h=.3, w=h/outAspect(); nl.corners=[[.5-w/2,.5-h/2],[.5+w/2,.5-h/2],[.5+w/2,.5+h/2],[.5-w/2,.5+h/2]];
+  S.editImg=false; selectLayer(S.sel); toast('Loch-Fläche angelegt. Wo sie liegt, wird nichts gezeigt.');
 }
 function deleteLayer(i){
   if(guardLock()) return;
@@ -1069,9 +1241,10 @@ function renderLayers(){
       <span class="nm" title="Doppelklick = umbenennen"></span>
       <button class="ib" data-a="up" title="Nach vorne">▲</button><button class="ib" data-a="down" title="Nach hinten">▼</button>
       <button class="ib" data-a="rep" title="Bild ersetzen (Mapping bleibt)">⟳</button><button class="ib" data-a="del" title="Entfernen">✕</button>`;
-    row.querySelector('.nm').textContent=l.name;
+    row.querySelector('.nm').textContent=l.name+(l.cut==='overlap'?' ✂':'');
     const cv=row.querySelector('canvas'), g=cv.getContext('2d');
-    if(l.img){const s=Math.min(68/l.img.width,68/l.img.height),w=l.img.width*s,h=l.img.height*s;g.drawImage(l.img,(68-w)/2,(68-h)/2,w,h);}
+    if(l.cut==='hole'){g.fillStyle='#2a1616';g.fillRect(0,0,68,68);g.strokeStyle='#ff6b5f';g.lineWidth=4;g.beginPath();g.moveTo(16,16);g.lineTo(52,52);g.moveTo(52,16);g.lineTo(16,52);g.stroke();}
+    else if(l.img){const s=Math.min(68/l.img.width,68/l.img.height),w=l.img.width*s,h=l.img.height*s;g.drawImage(l.img,(68-w)/2,(68-h)/2,w,h);}
     row.onclick=e=>{
       const a=e.target.dataset&&e.target.dataset.a;
       if(a==='vis'){l.visible=!l.visible;renderLayers();saveLocal();return;}
@@ -1094,14 +1267,14 @@ function persistImage(l){ if(l.imgData&&!l.isDemo) IDB.put('img'+l.id,l.imgData)
 function saveLocal(){
   clearTimeout(saveLocal._t);
   saveLocal._t=setTimeout(()=>{try{localStorage.setItem('artloop.v3',JSON.stringify({
-    layers:S.layers.map(l=>({id:l.id,name:l.name,p:l.p,corners:l.corners,crop:l.crop,visible:l.visible,look:l.look,isDemo:l.isDemo})),
+    layers:S.layers.map(l=>({id:l.id,name:l.name,p:l.p,corners:l.corners,crop:l.crop,visible:l.visible,look:l.look,isDemo:l.isDemo,shape:l.shape,cut:l.cut})),
     sel:S.sel,locked:S.locked,loopLen:S.loopLen,colors:S.colors,swatches:S.swatches,outAspect:S.outAspect}));}catch(e){}},250);
 }
 function loadLocal(){
   try{
     const j=JSON.parse(localStorage.getItem('artloop.v3')||'null');
     if(j&&j.layers&&j.layers.length){
-      S.layers=j.layers.map(o=>newLayer({...o,p:{...DEF,...o.p}})); LAYER_ID=Math.max(...S.layers.map(l=>l.id))+1;
+      S.layers=j.layers.map(o=>newLayer({...o,p:{...DEF,...o.p},shape:cleanShape(o.shape),cut:cleanCut(o.cut)})); LAYER_ID=Math.max(...S.layers.map(l=>l.id))+1;
       S.sel=Math.min(j.sel||0,S.layers.length-1); S.locked=!!j.locked; S.loopLen=j.loopLen||8;
       S.colors={...DEF_COLORS,...j.colors}; if(j.swatches)S.swatches=j.swatches; if(j.outAspect)S.outAspect=j.outAspect;
       return true;
@@ -1213,15 +1386,60 @@ function fitCorners(f){
   const x0=(1-wf)/2,y0=(1-hf)/2; S.corners=[[x0,y0],[x0+wf,y0],[x0+wf,y0+hf],[x0,y0+hf]]; saveLocal();
 }
 
+function applyShape(kind){
+  if(guardLock()) return;
+  const l=L(); l.shape=kind==='rect'?null:makeForm(l,kind);
+  S.editImg=false; mapEd.sel=-1; if(outEd) outEd.sel=-1;
+  refreshShapeUI(); saveLocal();
+}
+function setEditImg(v){
+  if(!L().shape) return;
+  S.editImg=v; mapEd.sel=-1; if(outEd) outEd.sel=-1; refreshShapeUI();
+}
+function setCut(v){
+  if(guardLock()) return;
+  L().cut=v; refreshShapeUI(); renderLayers(); saveLocal();
+  if(v==='overlap'&&S.layers.filter(l=>l.visible).length<2) toast('Zum Ausschneiden braucht es eine zweite Fläche, die diese überlappt.');
+}
+// Vergrößert das Bild so weit, dass es die ganze Form abdeckt. Die Form bleibt, wo sie ist.
+function imageCoverForm(){
+  if(guardLock()) return;
+  const l=L(); if(!l.shape) return;
+  const form=shapeCtrlOut(l), out=layerOutline(l); let n=l.corners.map(c=>c.slice());
+  for(let it=0;it<6;it++){
+    const H=sq2quad(n), I=inv3(H), uv=out.map(p=>mapH(I,p[0],p[1]));
+    const us=uv.map(p=>p[0]), vs=uv.map(p=>p[1]), u0=Math.min(...us), u1=Math.max(...us), v0=Math.min(...vs), v1=Math.max(...vs);
+    const f=Math.max(u1-u0,v1-v0)*1.01, t=mapH(H,(u0+u1)/2,(v0+v1)/2), c=mapH(H,.5,.5);
+    n=n.map(p=>[t[0]+(p[0]-c[0])*f,t[1]+(p[1]-c[1])*f]);
+  }
+  setKeepForm(l,n,form); saveLocal();
+}
+function refreshShapeUI(){
+  const l=L(), sh=l.shape, cur=!sh?'rect':sh.t==='ellipse'?'ellipse':String(sh.pts.length);
+  document.querySelectorAll('#shapeChips .chip').forEach(c=>c.classList.toggle('act',c.dataset.shape===cur));
+  document.querySelectorAll('#cutChips .chip').forEach(c=>c.classList.toggle('act',c.dataset.cut===l.cut));
+  $('formTools').style.display=sh?'flex':'none';
+  $('bEditForm').classList.toggle('on',!S.editImg); $('bEditImg').classList.toggle('on',S.editImg);
+  $('shapeHint').textContent=!sh?'Die vier Ecken verzerren Bild und Fläche.':
+    S.editImg?'Bild verschieben, drehen oder verzerren. Die Form bleibt an ihrer Stelle.':
+    sh.t==='ellipse'?'Die vier Punkte formen den Kreis, auch schräg in der Perspektive.':
+    'Punkte ziehen. Doppelklick auf eine Kante fügt einen Punkt hinzu, Doppelklick auf einen Punkt entfernt ihn ('+sh.pts.length+' Punkte).';
+  $('cutHint').textContent=l.cut==='overlap'?'Wo diese Fläche eine andere überlappt, wird bei beiden nichts gezeigt.':
+    l.cut==='hole'?'Diese Fläche zeigt kein Bild. Wo sie liegt, wird von allen anderen nichts gezeigt.':
+    'Die vordere Fläche liegt über der hinteren.';
+}
+
 /* ---------- Vorschau ---------- */
 const pv=$('pv'), ov=$('ov');
 let prev=null;
 try{ prev=new Renderer(pv,.6);}catch(e){alert('WebGL2 nicht verfügbar: '+e.message+'\nBitte aktuellen Chrome, Edge oder Firefox verwenden.');}
 let tab='map';
 let FRAME={x:0,y:0,w:10,h:10};
-const otherLayers=()=>S.layers.map((l,i)=>({corners:l.corners,idx:i,name:l.name,vis:l.visible&&!!l.img})).filter(o=>o.idx!==S.sel&&o.vis);
-const mapEd=new CornerEditor(ov,{get:()=>S.corners,set:c=>{S.corners=c;saveLocal();},frame:()=>FRAME,
-  others:otherLayers, pick:i=>selectLayer(i), label:()=>S.layers.length>1?L().name:'',
+const otherLayers=()=>S.layers.map((l,i)=>({outline:layerOutline(l),hole:l.cut==='hole',idx:i,name:l.name,vis:l.visible&&!!l.img})).filter(o=>o.idx!==S.sel&&o.vis);
+const layerEd=()=>({get:()=>S.corners,set:c=>{S.corners=c;saveLocal();},layer:L,
+  setKeep:(n,form)=>{setKeepForm(L(),n,form);saveLocal();}, setForm:q=>{setFormOut(L(),q);saveLocal();},
+  others:otherLayers, pick:i=>selectLayer(i), label:()=>S.layers.length>1?L().name:''});
+const mapEd=new CornerEditor(ov,{...layerEd(),frame:()=>FRAME,
   bg:(g,F)=>{g.save();g.fillStyle='rgba(255,255,255,.35)';g.font=`${11*(window.devicePixelRatio||1)}px system-ui`;g.textBaseline='bottom';
     g.fillText('Beamerbild',F.x,F.y-4);g.restore();},
   refW:()=>outWin&&!outWin.closed?outWin.innerWidth*(outWin.devicePixelRatio||1):1920,
@@ -1299,7 +1517,7 @@ body.nocur,body.nocur *{cursor:none!important}
   d.close();
   const c=d.getElementById('c'), o=d.getElementById('ov');
   try{outR=new Renderer(c,1);}catch(e){toast('Ausgabe: '+e.message);return;}
-  outEd=new CornerEditor(o,{get:()=>S.corners,set:cs=>{S.corners=cs;saveLocal();},others:otherLayers,pick:i=>selectLayer(i),label:()=>S.layers.length>1?L().name:''});
+  outEd=new CornerEditor(o,layerEd());
   outEd.locked=S.locked;
   outEdit=false;
   const W=outWin, hint=d.getElementById('hint');
@@ -1338,6 +1556,7 @@ function handleKey(e,fromOut,toggleFS,showHint){
   if(fromOut&&outEdit&&outEd.key(e)){e.preventDefault();return;}
   if(!fromOut){const ed=tab==='map'?mapEd:cropEd; if(ed.key(e)){e.preventDefault(); if(tab==='crop'&&S.img) computeRect(); return;}}
   if(k==='g'){toggleGrid();}
+  else if(k==='i'&&L().shape&&!S.locked){setEditImg(!S.editImg);}
   else if(k==='b'){toggleBlack();}
   else if(k===' '){togglePlay();e.preventDefault();}
   else if(k==='e'&&S.locked){ guardLock(); if(fromOut&&showHint) showHint(1500); }
@@ -1483,7 +1702,7 @@ async function downloadPy(){
 /* ---------- Projekt speichern / öffnen ---------- */
 function saveProject(){
   const j={app:'ArtLoop',v:3,colors:S.colors,swatches:S.swatches,outAspect:S.outAspect,taste:Taste,locked:S.locked,loopLen:S.loopLen,sel:S.sel,
-    layers:S.layers.map(l=>({name:l.name,p:l.p,corners:l.corners,crop:l.crop,visible:l.visible,look:l.look,isDemo:l.isDemo,image:l.isDemo?null:l.imgData}))};
+    layers:S.layers.map(l=>({name:l.name,p:l.p,corners:l.corners,crop:l.crop,visible:l.visible,look:l.look,isDemo:l.isDemo,shape:l.shape,cut:l.cut,image:l.isDemo?null:l.imgData}))};
   const blob=new Blob([JSON.stringify(j)],{type:'application/json'}); const a=document.createElement('a');
   a.href=URL.createObjectURL(blob); a.download='artloop_projekt.json'; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href),30000); toast('Projekt gespeichert (alle Bilder, Mapping, Looks, Farben, Geschmack).');
@@ -1495,7 +1714,7 @@ function openProject(f){
     const metas=j.layers||[{name:'Bild',p:j.v===2?(j.p||{}):{},corners:j.corners,crop:j.crop,visible:true,look:j.look,isDemo:!!j.isDemo,image:j.image}];
     S.layers.forEach(l=>IDB.del('img'+l.id));
     const demo=demoArt();
-    S.layers=metas.map(m=>newLayer({name:typeof m.name==='string'&&m.name?m.name.slice(0,200):'Bild',p:{...DEF,...m.p},corners:m.corners||[[.1,.1],[.9,.1],[.9,.9],[.1,.9]],crop:m.crop||FULL(),visible:m.visible!==false,look:m.look||null}));
+    S.layers=metas.map(m=>newLayer({name:typeof m.name==='string'&&m.name?m.name.slice(0,200):'Bild',p:{...DEF,...m.p},corners:m.corners||[[.1,.1],[.9,.1],[.9,.9],[.1,.9]],crop:m.crop||FULL(),visible:m.visible!==false,look:m.look||null,shape:cleanShape(m.shape),cut:cleanCut(m.cut)}));
     S.sel=Math.min(j.sel||0,S.layers.length-1);
     if(j.colors) S.colors={...DEF_COLORS,...j.colors}; if(Array.isArray(j.swatches)) S.swatches=j.swatches.filter(c=>typeof c==='string').slice(0,16);
     if(j.outAspect) S.outAspect=j.outAspect; if(j.loopLen||(j.p&&j.p.loop)) S.loopLen=j.loopLen||j.p.loop;
@@ -1523,6 +1742,12 @@ refreshInputs(); markLook(); updateLearnInfo(); setActiveColor(S.activeColor);
 $('file').addEventListener('change',e=>{[...(e.target.files||[])].forEach(f=>loadFile(f));e.target.value='';});
 $('fileReplace').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(f)loadFile(f,true);e.target.value='';});
 $('bLock').onclick=toggleLock;
+document.querySelectorAll('#shapeChips .chip').forEach(c=>c.onclick=()=>{const v=c.dataset.shape;applyShape(v==='rect'||v==='ellipse'?v:+v);});
+document.querySelectorAll('#cutChips .chip').forEach(c=>c.onclick=()=>setCut(c.dataset.cut));
+$('bEditForm').onclick=()=>setEditImg(false);
+$('bEditImg').onclick=()=>setEditImg(true);
+$('bCover').onclick=imageCoverForm;
+$('bAddHole').onclick=addHole;
 $('bOut').onclick=openOutput;
 $('bPlay').onclick=togglePlay;
 $('bReset').onclick=resetAll;
@@ -1550,8 +1775,9 @@ $('projFile').onchange=e=>{if(e.target.files[0])openProject(e.target.files[0]);e
 $('selAspect').onchange=e=>{S.outAspect=+e.target.value;saveLocal();};
 $('bFit').onclick=()=>{if(!guardLock())fitCorners(.8);};
 $('bFill').onclick=()=>{if(guardLock())return;S.corners=FULL();saveLocal();};
-$('bFlipH').onclick=()=>{if(guardLock())return;const c=S.corners;S.corners=[c[1],c[0],c[3],c[2]];saveLocal();};
-$('bFlipV').onclick=()=>{if(guardLock())return;const c=S.corners;S.corners=[c[3],c[2],c[1],c[0]];saveLocal();};
+const flipImage=order=>{if(guardLock())return;const l=L(),c=l.corners;setKeepForm(l,order.map(i=>c[i]),l.shape?shapeCtrlOut(l):null);saveLocal();};
+$('bFlipH').onclick=()=>flipImage([1,0,3,2]);
+$('bFlipV').onclick=()=>flipImage([3,2,1,0]);
 document.querySelectorAll('.tab').forEach(el=>el.onclick=()=>setTab(el.dataset.tab));
 let dragN=0;
 window.addEventListener('dragenter',e=>{e.preventDefault();dragN++;$('drop').classList.add('show');});
