@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <!-- CSP: script-src enthaelt den sha256-Hash des Hauptskripts (das script-Element ohne Attribute). Nach jeder Aenderung daran neu berechnen, sonst startet die App nicht. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZB4XMHriSkEDyfbOeFK1VraVyiwg+l/u8oTSTXwpONw='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src blob:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ApQTblabVOfWlz0HqmGERqVtZhe53YWEypLiTZgy4bs='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src blob:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ArtLoop Projection Studio</title>
 <meta name="description" content="Kunstwerke lebendig animieren und per Beamer projizieren – mit Mapping, Loop-Export und Syphon-Ausgang.">
@@ -174,7 +174,7 @@ select,input[type=number]{background:var(--panel2);border:1px solid var(--line);
       <div class="hint" id="shapeHint" style="margin:6px 0 0"></div>
       <h4 style="margin-top:12px;display:flex;justify-content:space-between;align-items:center">Überschneidung <button class="btn sm" id="bAddHole">+ Loch-Fläche</button></h4>
       <div class="chips" id="cutChips">
-        <span class="chip" data-cut="none">Überdecken</span><span class="chip" data-cut="overlap">Überschneidung ausschneiden</span><span class="chip" data-cut="hole">Nur Loch</span>
+        <span class="chip" data-cut="none">Überdecken</span><span class="chip" data-cut="overlap">Überschneidung ausschneiden</span><span class="chip" data-cut="only">Nur Überschneidung zeigen</span><span class="chip" data-cut="hole">Nur Loch</span>
       </div>
       <div class="hint" id="cutHint" style="margin:6px 0 0"></div>
     </div>
@@ -443,7 +443,7 @@ function cleanShape(s){
   const pts=s.pts.map(p=>Array.isArray(p)?[+p[0],+p[1]]:[NaN,NaN]);
   return pts.every(p=>Number.isFinite(p[0])&&Number.isFinite(p[1])&&Math.abs(p[0])<1e3&&Math.abs(p[1])<1e3)?{t:s.t,pts}:null;
 }
-function cleanCut(c){return c==='overlap'||c==='hole'?c:'none';}
+function cleanCut(c){return c==='overlap'||c==='hole'||c==='only'?c:'none';}
 
 /* ---------- Shader ---------- */
 const VS = `#version 300 es
@@ -798,6 +798,7 @@ class Renderer{
     const g=cv.getContext('2d'), gl=this.gl;
     const trace=l=>{g.beginPath();layerOutline(l).forEach(p=>g.lineTo(p[0]*W,p[1]*H));g.closePath();};
     g.lineJoin='round';
+    const hasOnly=list.some(l=>l.cut==='only');
     for(const l of list){
       if(l.cut==='hole'||!(cuts||l.shape)) continue;
       g.globalCompositeOperation='source-over'; g.globalAlpha=1; g.clearRect(0,0,W,H);
@@ -810,8 +811,17 @@ class Renderer{
         for(let k=N;k>=1;k--){g.globalAlpha=1/k;g.lineWidth=2*l.p.feather*size*k/N;g.stroke();}
         g.globalAlpha=1;
       }
+      if(hasOnly){ // „Nur Überschneidung“: übrig bleibt nur, was auch eine passende andere Fläche abdeckt
+        const c2=this.maskCv2||(this.maskCv2=document.createElement('canvas'));
+        if(c2.width!==W||c2.height!==H){c2.width=W;c2.height=H;}
+        const g2=c2.getContext('2d'); g2.clearRect(0,0,W,H); g2.fillStyle='#fff';
+        for(const o of list) if(o!==l&&o.cut!=='hole'&&(l.cut==='only'||o.cut==='only')){
+          g2.beginPath(); layerOutline(o).forEach(p=>g2.lineTo(p[0]*W,p[1]*H)); g2.closePath(); g2.fill();
+        }
+        g.globalCompositeOperation='destination-in'; g.drawImage(c2,0,0); g.globalCompositeOperation='destination-out';
+      }
       g.fillStyle='#000';
-      for(const o of list) if(o!==l&&(o.cut!=='none'||l.cut==='overlap')){trace(o);g.fill();}
+      for(const o of list) if(o!==l&&(o.cut==='overlap'||o.cut==='hole'||l.cut==='overlap')){trace(o);g.fill();}
       const r=this.R(l);
       if(!r.tMask){
         r.tMask=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,r.tMask);
@@ -1241,7 +1251,7 @@ function renderLayers(){
       <span class="nm" title="Doppelklick = umbenennen"></span>
       <button class="ib" data-a="up" title="Nach vorne">▲</button><button class="ib" data-a="down" title="Nach hinten">▼</button>
       <button class="ib" data-a="rep" title="Bild ersetzen (Mapping bleibt)">⟳</button><button class="ib" data-a="del" title="Entfernen">✕</button>`;
-    row.querySelector('.nm').textContent=l.name+(l.cut==='overlap'?' ✂':'');
+    row.querySelector('.nm').textContent=l.name+(l.cut==='overlap'?' ✂':l.cut==='only'?' ◐':'');
     const cv=row.querySelector('canvas'), g=cv.getContext('2d');
     if(l.cut==='hole'){g.fillStyle='#2a1616';g.fillRect(0,0,68,68);g.strokeStyle='#ff6b5f';g.lineWidth=4;g.beginPath();g.moveTo(16,16);g.lineTo(52,52);g.moveTo(52,16);g.lineTo(16,52);g.stroke();}
     else if(l.img){const s=Math.min(68/l.img.width,68/l.img.height),w=l.img.width*s,h=l.img.height*s;g.drawImage(l.img,(68-w)/2,(68-h)/2,w,h);}
@@ -1399,7 +1409,7 @@ function setEditImg(v){
 function setCut(v){
   if(guardLock()) return;
   L().cut=v; refreshShapeUI(); renderLayers(); saveLocal();
-  if(v==='overlap'&&S.layers.filter(l=>l.visible).length<2) toast('Zum Ausschneiden braucht es eine zweite Fläche, die diese überlappt.');
+  if((v==='overlap'||v==='only')&&S.layers.filter(l=>l.visible&&l.cut!=='hole').length<2) toast('Dafür braucht es eine zweite Fläche, die diese überlappt.');
 }
 // Vergrößert das Bild so weit, dass es die ganze Form abdeckt. Die Form bleibt, wo sie ist.
 function imageCoverForm(){
@@ -1426,6 +1436,7 @@ function refreshShapeUI(){
     'Punkte ziehen. Doppelklick auf eine Kante fügt einen Punkt hinzu, Doppelklick auf einen Punkt entfernt ihn ('+sh.pts.length+' Punkte).';
   $('cutHint').textContent=l.cut==='overlap'?'Wo diese Fläche eine andere überlappt, wird bei beiden nichts gezeigt.':
     l.cut==='hole'?'Diese Fläche zeigt kein Bild. Wo sie liegt, wird von allen anderen nichts gezeigt.':
+    l.cut==='only'?'Nur wo diese Fläche eine andere überlappt, ist Bild zu sehen, alles andere bleibt dunkel. Welches Bild dort erscheint, bestimmt die Reihenfolge der Bilder (▲▼).':
     'Die vordere Fläche liegt über der hinteren.';
 }
 

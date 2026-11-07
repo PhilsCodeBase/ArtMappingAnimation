@@ -1,5 +1,5 @@
 // ArtLoop – Offline-Unterstützung. Bei jeder neuen Version CACHE hochzählen.
-const CACHE = 'artloop-v6';
+const CACHE = 'artloop-v7';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './artloop_syphon.py'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));
