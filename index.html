@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <!-- CSP: script-src enthaelt den sha256-Hash des Hauptskripts (das script-Element ohne Attribute). Nach jeder Aenderung daran neu berechnen, sonst startet die App nicht. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-TDpEd/h/6lq81sR4OvI7bTjZKw+PcZIq8OrbOW1YEOs='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src blob:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-9ATWaynKFzsWecbw8HNW88mdCUrfSC+K+W3gOgA3gEg='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src blob:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ArtLoop Projection Studio</title>
 <meta name="description" content="Projection Mapping im Browser: Bilder, Videos, Kamera und Text auf Flächen, Kugeln und Würfel – mit Effekten, Loop-Export und Syphon.">
@@ -151,7 +151,8 @@ select.wide{flex:1;min-width:0}
     <div class="tabs">
       <div class="tab act" data-tab="map">Mapping</div>
       <div class="tab" data-tab="media">Medien</div>
-      <div class="tab" data-tab="crop">Zuschneiden</div>
+      <div class="tab" data-tab="crop" id="tabCrop" style="display:none">Zuschneiden</div>
+      <button class="btn sm pri" id="bCropDone" style="display:none;margin-left:6px">✓ Fertig</button>
       <div class="sp"></div>
       <button class="btn sm" id="bGrid">Testgitter</button>
       <button class="btn sm" id="bEdges">Kanten-Ansicht</button>
@@ -245,7 +246,7 @@ select.wide{flex:1;min-width:0}
     </div>
     <div class="panel" id="panelCrop">
       <div class="box"><h4>Zuschneiden</h4><div class="hint" id="cropInfo"></div>
-        <div class="btnrow"><button class="btn sm" id="bCropReset">Zuschnitt zurücksetzen</button><button class="btn sm" id="bCropBack">Zurück zu Medien</button></div></div>
+        <div class="btnrow"><button class="btn sm pri" id="bCropDone2">✓ Fertig</button><button class="btn sm" id="bCropReset">Zuschnitt zurücksetzen</button></div></div>
     </div>
   </aside>
 </div>
@@ -332,11 +333,10 @@ const UI = [
   {k:'bri', l:'Helligkeit', min:-.5, max:.5, def:0},
   {k:'con', l:'Kontrast', min:.5, max:2, def:1},
   {k:'gain',l:'Gesamthelligkeit Ausgabe', max:3, def:1},
-  {k:'feather', l:'Ränder weich', max:.2, step:.005, def:0},
  ]},
 ];
 // Versteckte Feinwerte – nur von Vorlagen gesetzt
-const HIDDEN = {trBase:.35,trSharp:12,trCyc:2,flCyc:2,flRot:0,hue:0,hueCyc:0,eDetail:.8,eSoft:.06,eCol:.6,trScale:1.6,
+const HIDDEN = {feather:0,trBase:.35,trSharp:12,trCyc:2,flCyc:2,flRot:0,hue:0,hueCyc:0,eDetail:.8,eSoft:.06,eCol:.6,trScale:1.6,
   puWidth:.15,puCyc:1,puX:.5,puY:.5,puImg:.3,liH:.4,liR:.35,liCyc:1,liAmb:.3,spDark:.75,spCyc:1,parCyc:1,parInv:0,
   wiScale:1.5,boSteps:48,shSpeed:.9,lqSpeed:.8};
 const ROWS = {}; const DEF = {...HIDDEN};
@@ -414,6 +414,7 @@ const TR=[
 const TDEF={s:'Dein Text',font:'system',color:'#ffffff',bg:false,bgColor:'#000000',align:'center',upper:false};
 TR.forEach(r=>TDEF[r.k]=r.def);
 const SR=[
+ {k:'soft',l:'Kante weich',min:0,max:1,step:.01,def:0,fmt:'%'},
  {k:'round',l:'Ecken abrunden',min:0,max:1,step:.01,def:0,fmt:'%'},
  {k:'spin',l:'Kugel dreht (Umdrehungen pro Loop)',min:-4,max:4,step:1,def:1,fmt:v=>v?String(v):'steht'},
  {k:'shade',l:'3D-Schattierung',min:0,max:1,step:.01,def:.5,fmt:'%'},
@@ -480,7 +481,7 @@ const FULL=()=>[[0,0],[1,0],[1,1],[0,1]];
 let LAYER_ID=1, MEDIA_ID=1, FONT_ID=1;
 // Fläche (Mapping-Objekt). corners = Bild-Viereck im Beamerbild (0..1), home = Ausgangslage für „zurücksetzen“
 function newLayer(o){return Object.assign({id:LAYER_ID++,name:'Fläche',p:{...DEF},corners:[[.3,.3],[.7,.3],[.7,.7],[.3,.7]],home:null,
-  shape:null,cut:'none',round:0,bend:null,spin:1,shade:.5,media:[],visible:true,look:null,
+  shape:null,cut:'none',round:0,soft:0,bend:null,spin:1,shade:.5,media:[],visible:true,look:null,
   srcVersion:0,edgeVersion:0,rectW:1000,rectH:1000},o||{});}
 // Medium (Bild, Video, Kamera, Text). el = Quelle fürs Rendern, blob = Originaldatei
 function newMedia(o){return Object.assign({id:MEDIA_ID++,kind:'image',name:'Datei',visible:true,p:{...MDEF},flipH:false,flipV:false,crop:FULL(),
@@ -575,11 +576,11 @@ function layerOutline(l){
 }
 // Teilflächen, die gezeichnet werden: je eine Homographie Einheitsquadrat → Beamerbild
 function surfPatches(l,override){
-  if(override) return [{H:sq2quad(override),mode:0,dark:0,bend:null,round:0,aa:1}];
+  if(override) return [{H:sq2quad(override),mode:0,dark:0,bend:null,round:0,soft:0,aa:1}];
   const sh=l.shape;
-  if(sh&&sh.t==='sphere') return [{H:sq2quad(shapeCtrlOut(l)),mode:1,dark:0,round:0,aa:1}];
-  if(sh&&sh.t==='cube') return cubeFaces(shapeCtrlOut(l)).map((f,i)=>({H:sq2quad(f),mode:0,dark:[0,.25,.45][i]*l.shade,round:0,aa:0}));
-  return [{H:sq2quad(l.corners),mode:0,dark:0,bend:l.bend,round:sh?0:l.round,aa:1}];
+  if(sh&&sh.t==='sphere') return [{H:sq2quad(shapeCtrlOut(l)),mode:1,dark:0,round:0,soft:l.soft,aa:1}];
+  if(sh&&sh.t==='cube') return cubeFaces(shapeCtrlOut(l)).map((f,i)=>({H:sq2quad(f),mode:0,dark:[0,.25,.45][i]*l.shade,round:0,soft:0,aa:0}));
+  return [{H:sq2quad(l.corners),mode:0,dark:0,bend:l.bend,round:sh?0:l.round,soft:sh?0:l.soft,aa:1}];
 }
 // Neue Form mittig im Bild, im Beamerbild wirklich rund bzw. regelmäßig (nicht mit dem Bildformat verzerrt)
 function makeForm(l,kind){
@@ -636,13 +637,14 @@ function pathRounded(g,P,r){
 function traceSurface(g,l,W,H){
   const P=layerOutline(l).map(p=>[p[0]*W,p[1]*H]);
   let r=0;
-  if(l.round>0&&(l.shape?l.shape.t==='poly':!l.bend)){
+  if(l.round>0&&(l.shape?(l.shape.t==='poly'||l.shape.t==='cube'):!l.bend)){
     const xs=P.map(p=>p[0]),ys=P.map(p=>p[1]);
     r=l.round*0.5*Math.min(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys));
   }
   pathRounded(g,P,r);
 }
-const needsShapeMask=l=>!!(l.shape&&(l.shape.t==='ellipse'||l.shape.t==='poly'));
+// Kreis und Vieleck brauchen immer eine Maske, der Würfel nur für weiche Kanten oder runde Ecken (Viereck und Kugel rechnet der Shader)
+const needsShapeMask=l=>!!(l.shape&&(l.shape.t==='ellipse'||l.shape.t==='poly'||(l.shape.t==='cube'&&(l.soft>0||l.round>0))));
 
 /* ---------- Shader ---------- */
 const VS = `#version 300 es
@@ -934,24 +936,24 @@ void main(){
 const FS_MESH = `#version 300 es
 precision highp float;
 uniform sampler2D uTex; uniform sampler2D uMask; uniform vec2 uOut;
-uniform float uGrid,uMaskOn,uMode,uShade,uSpin,uRound,uAsp,uAA;
+uniform float uGrid,uMaskOn,uMode,uShade,uSpin,uRound,uAsp,uAA,uSoft;
 in vec2 vS; out vec4 fo;
 const float PI=3.14159265359;
 void main(){
   vec2 fw=fwidth(vS)+1e-6;
   float m=1.0; vec4 tx;
   if(uMode<0.5){
-    if(uAA>0.5){vec2 m2=smoothstep(vec2(0.0),fw,vS)*smoothstep(vec2(0.0),fw,1.0-vS); m=m2.x*m2.y;}
-    if(uRound>0.0){
+    if(uAA>0.5){ // Abstand zum (abgerundeten) Rand, daraus harte oder weiche Kante
       vec2 p=(vS-0.5)*vec2(uAsp,1.0); float rr=uRound*0.5*min(uAsp,1.0);
-      vec2 b=vec2(uAsp,1.0)*0.5-rr; float dd=length(max(abs(p)-b,0.0))-rr; float aa=fwidth(dd)+1e-6;
-      m*=1.0-smoothstep(-aa,aa,dd);
+      vec2 q=abs(p)-(vec2(uAsp,1.0)*0.5-rr);
+      float dd=length(max(q,0.0))+min(max(q.x,q.y),0.0)-rr, aa=fwidth(dd)+1e-6;
+      m=smoothstep(-aa,uSoft*0.25*min(uAsp,1.0)+aa,-dd);
     }
     tx=texture(uTex,vS);
     tx.rgb*=1.0-uShade;
   } else {
     vec2 d=vS*2.0-1.0; float r=length(d), aa=fwidth(r)+1e-5;
-    m=1.0-smoothstep(1.0-aa,1.0+aa,r);
+    m=1.0-smoothstep(1.0-uSoft*0.5-aa,1.0+aa,r);
     float z=sqrt(max(0.0,1.0-min(r*r,1.0)));
     vec2 ll=vec2(atan(d.x,max(z,1e-4))/PI+0.5,asin(clamp(d.y,-1.0,1.0))/PI+0.5);
     tx=textureGrad(uTex,vec2(fract(ll.x+uSpin),ll.y),dFdx(ll),dFdy(ll));
@@ -1073,7 +1075,7 @@ class Renderer{
       const P=m.p, asp=mediaAspect(m), rot=P.rot*Math.PI/180, turned=Math.abs(Math.sin(rot))>.7071;
       const a1=turned?ra:ra/asp, a2=turned?1/asp:1, fit=m.fit==='contain'?Math.min(a1,a2):Math.max(a1,a2);
       this.um(pr,'uCrop',sq2quad(m.crop)); this.u(pr,'uSrcAsp',asp); this.u(pr,'uFitS',fit);
-      this.u(pr,'uScale',P.scale); this.u(pr,'uRot',rot); this.u(pr,'uFlip',m.flipH?-1:1,m.flipV?-1:1);
+      this.u(pr,'uScale',P.scale); this.u(pr,'uRot',rot); this.u(pr,'uFlip',(m.flipH?-1:1)*(m.kind==='camera'?-1:1),m.flipV?-1:1);
       this.u(pr,'uOff',P.offX,P.offY); this.u(pr,'uOp',P.opacity);
       this.u(pr,'uKal',P.kal); this.u(pr,'uKalRot',P.kalRot*Math.PI/180+phase*Math.PI*2*P.kalSpin);
       this.u(pr,'uZoom',P.zoom); this.u(pr,'uZoomPulse',P.zoomPulse); this.u(pr,'uBlur',P.blur); this.u(pr,'uBW',P.bw); this.u(pr,'uInv',P.inv);
@@ -1105,7 +1107,7 @@ class Renderer{
     if(dyn||sig!==r.csig){ this.compose(l,ms,phase); r.csig=sig; fresh=true; }
     const P=l.p, needE=view||P.trAmt>0||P.puAmt>0||P.liAmt>0||P.parAmt>0||P.flAmt>0;
     if(r.edge!==l.edgeVersion||(fresh&&(!dyn||needE))){ this.edges(l); r.edge=l.edgeVersion; }
-    this.renderAnim(l,phase,view,noFeather); return true;
+    this.renderAnim(l,phase,view,true); return true;
   }
   renderAnim(L,phase,view,noFeather){
     const P=L.p,r=this.R(L),pr=this.pA,A=r.tAnim,gl=this.gl;
@@ -1120,7 +1122,7 @@ class Renderer{
   }
   // Pro Fläche eine Maske in Ausgabegröße: eigene Form minus alles, was hier ausgeschnitten wird. Nur bei Änderungen neu.
   updateMasks(list,W,H,cuts){
-    const sig=JSON.stringify([W,H,list.map(l=>[l.id,l.cut,l.shape,l.corners,l.bend,l.round,l.shape?l.p.feather:0])]);
+    const sig=JSON.stringify([W,H,list.map(l=>[l.id,l.cut,l.shape,l.corners,l.bend,l.round,l.soft])]);
     if(sig===this.maskSig) return;
     this.maskSig=sig;
     const cv=this.maskCv||(this.maskCv=document.createElement('canvas'));
@@ -1133,11 +1135,11 @@ class Renderer{
       g.globalCompositeOperation='source-over'; g.globalAlpha=1; g.clearRect(0,0,W,H);
       g.fillStyle='#fff'; traceSurface(g,l,W,H); g.fill();
       g.globalCompositeOperation='destination-out';
-      if(needsShapeMask(l)&&l.p.feather>0){ // „Ränder weich“ folgt der Form statt dem Bild-Viereck
+      if(needsShapeMask(l)&&l.soft>0){ // „Kante weich“ folgt der Form
         const o=layerOutline(l), xs=o.map(p=>p[0]*W), ys=o.map(p=>p[1]*H);
         const size=Math.min(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys)), N=12;
         g.strokeStyle='#000'; traceSurface(g,l,W,H);
-        for(let k=N;k>=1;k--){g.globalAlpha=1/k;g.lineWidth=2*l.p.feather*size*k/N;g.stroke();}
+        for(let k=N;k>=1;k--){g.globalAlpha=1/k;g.lineWidth=2*l.soft*0.25*size*k/N;g.stroke();}
         g.globalAlpha=1;
       }
       if(hasOnly){ // „Nur Überschneidung“: übrig bleibt nur, was auch eine passende andere Fläche abdeckt
@@ -1183,7 +1185,7 @@ class Renderer{
       this.u(pr,'uAsp',l.rectW/l.rectH); this.u(pr,'uSpin',((l.spin||0)*phase)%1);
       for(const p of surfPatches(l,o.corners)){
         this.um(pr,'uP',p.H); this.u(pr,'uMode',p.mode); this.u(pr,'uShade',p.mode?l.shade:p.dark);
-        this.u(pr,'uRound',mapped?p.round:0); this.u(pr,'uAA',p.aa);
+        this.u(pr,'uRound',mapped?p.round:0); this.u(pr,'uSoft',mapped?p.soft:0); this.u(pr,'uAA',p.aa);
         if(p.bend&&bl!==null){this.u(pr,'uBendOn',1); gl.uniform2fv(bl,new Float32Array(p.bend.flat()));} else this.u(pr,'uBendOn',0);
         gl.drawElements(gl.TRIANGLES,this.mesh.n,gl.UNSIGNED_SHORT,0);
       }
@@ -1609,7 +1611,7 @@ function drawThumb(cv,m){
   const [iw,ih]=mediaDims(m); if(!iw||!ih) return;
   if(m.kind==='text'){ g.fillStyle='#000'; g.fillRect(0,0,W,H); }
   const s=Math.min(W/iw,H/ih), w=iw*s, h=ih*s;
-  try{ g.drawImage(m.el,(W-w)/2,(H-h)/2,w,h); }catch(e){}
+  try{ g.save(); if(m.kind==='camera'){g.translate(W,0);g.scale(-1,1);} g.drawImage(m.el,(W-w)/2,(H-h)/2,w,h); g.restore(); }catch(e){}
 }
 function renderLayers(){
   const box=$('layers'); if(!box) return; box.innerHTML='';
@@ -1946,7 +1948,7 @@ function mkSlider(r,onSet){
 const MS={}, TS={}, SS={};
 function setMParam(k,v){ const m=M(); if(!m) return; m.p[k]=v; if(k==='speed') syncPlay(m); }
 function setTParam(k,v){ const m=M(); if(!m||m.kind!=='text') return; m.text[k]=v; renderText(m); }
-function setSurfParam(k,v){ const l=L(); l[k]=v; if(k==='shade'||k==='round') saveLocal(); }
+function setSurfParam(k,v){ const l=L(); l[k]=v; }
 function buildMediaControls(){
   const add=(id,g)=>MP.filter(r=>r.g===g).forEach(r=>{const s=mkSlider(r,setMParam);MS[r.k]=s;$(id).appendChild(s.el);});
   add('mpXfRows','xf'); add('mpFxRows','fx'); add('mpPlayRows','play');
@@ -1989,7 +1991,7 @@ const IDB={db:null,
   async tx(mode,fn){try{const db=await this.open();return await new Promise((res,rej)=>{const t=db.transaction('img',mode),st=t.objectStore('img');const rq=fn(st);t.oncomplete=()=>res(rq&&rq.result);t.onerror=()=>rej(t.error);});}catch(e){return null;}},
   put(k,v){return this.tx('readwrite',st=>st.put(v,k));}, get(k){return this.tx('readonly',st=>st.get(k));},
   del(k){return this.tx('readwrite',st=>st.delete(k));}, clear(){return this.tx('readwrite',st=>st.clear());}};
-function surfMeta(l){return {id:l.id,name:l.name,p:l.p,corners:l.corners,home:l.home,shape:l.shape,cut:l.cut,round:l.round,bend:l.bend,
+function surfMeta(l){return {id:l.id,name:l.name,p:l.p,corners:l.corners,home:l.home,shape:l.shape,cut:l.cut,round:l.round,soft:l.soft,bend:l.bend,
   spin:l.spin,shade:l.shade,media:l.media,visible:l.visible,look:l.look};}
 function mediaMeta(m){return {id:m.id,kind:m.kind,name:m.name,visible:m.visible,p:m.p,flipH:m.flipH,flipV:m.flipV,crop:m.crop,fit:m.fit,
   paused:m.paused,muted:m.muted,text:m.text,isDemo:m.isDemo,dev:m.dev};}
@@ -2030,7 +2032,8 @@ function cleanSurface(o){
   const bend=cleanPts(o.bend,16,16);
   const media=Array.isArray(o.media)?[...new Set(o.media.map(cleanId).filter(Boolean))].slice(0,64):[];
   return newLayer({id,name:cleanStr(o.name,'Fläche',200)||'Fläche',p:cleanParams(o.p),corners,home:cleanPts(o.home,4,4)||corners.map(c=>c.slice()),
-    shape:cleanShape(o.shape),cut:cleanCut(o.cut),round:cleanNum(o.round,0,1,0),bend,spin:cleanNum(o.spin,-4,4,1),shade:cleanNum(o.shade,0,1,.5),
+    shape:cleanShape(o.shape),cut:cleanCut(o.cut),round:cleanNum(o.round,0,1,0),bend,
+    soft:cleanNum(o.soft,0,1,o.p&&+o.p.feather>0?Math.min(1,+o.p.feather*5):0),spin:cleanNum(o.spin,-4,4,1),shade:cleanNum(o.shade,0,1,.5),
     media,visible:o.visible!==false,look:typeof o.look==='string'?o.look.slice(0,80):null});
 }
 // Zustand übernehmen: Aufbau sofort, Dateien (Bilder, Videos, Schriften) danach über getBlob
@@ -2215,7 +2218,7 @@ function refreshShapeUI(){
   document.querySelectorAll('#editSeg button').forEach(b=>{b.style.display=modes.includes(b.dataset.edit)?'':'none';b.classList.toggle('on',b.dataset.edit===mode);});
   document.querySelector('#editSeg [data-edit=image]').textContent=sh?'Bild':'Ecken';
   $('bCover').style.display=sh&&!BODY(sh.t)?'':'none';
-  SS.round.el.style.display=(!sh||sh.t==='poly')?'':'none'; SS.spin.el.style.display=sh&&sh.t==='sphere'?'':'none'; SS.shade.el.style.display=sh&&BODY(sh.t)?'':'none';
+  SS.round.el.style.display=(!sh||sh.t==='poly'||sh.t==='cube')?'':'none'; SS.spin.el.style.display=sh&&sh.t==='sphere'?'':'none'; SS.shade.el.style.display=sh&&BODY(sh.t)?'':'none';
   for(const k in SS) SS[k].set(l[k]);
   $('shapeHint').textContent=
     sh&&sh.t==='sphere'?'Die vier Punkte legen die Kugel fest, auch schräg. Der Inhalt wird um die Kugel gewickelt.':
@@ -2247,11 +2250,13 @@ const mapEd=new CornerEditor(ov,{...layerEd(),frame:()=>FRAME,
     g.fillText('Beamerbild',F.x,F.y-4);g.restore();},
   refW:()=>outWin&&!outWin.closed?outWin.innerWidth*(outWin.devicePixelRatio||1):1920,
   refH:()=>outWin&&!outWin.closed?outWin.innerHeight*(outWin.devicePixelRatio||1):1080});
-const cropEd=new CornerEditor(ov,{get:()=>M()?M().crop:FULL(),frame:()=>FRAME,
+const cropMirror=()=>{const m=M();return !!(m&&m.kind==='camera');};
+const cropEd=new CornerEditor(ov,{get:()=>M()?M().crop:FULL(),frame:()=>cropMirror()?{x:FRAME.x+FRAME.w,y:FRAME.y,w:-FRAME.w,h:FRAME.h}:FRAME,
   set:c=>{const m=M(); if(m) m.crop=c.map(p=>[Math.min(1,Math.max(0,p[0])),Math.min(1,Math.max(0,p[1]))]);},
   onChange:(ch,end)=>{if(end){saveLocal();}},color:'#ffb547',
   refW:()=>M()?mediaDims(M())[0]:1000, refH:()=>M()?mediaDims(M())[1]:1000,
-  bg:(g,F)=>{const m=M(); if(!m||!m.el) return; try{g.drawImage(m.el,F.x,F.y,F.w,F.h);}catch(e){}
+  bg:(g,F)=>{const m=M(); if(!m||!m.el) return; const x0=Math.min(F.x,F.x+F.w), w=Math.abs(F.w);
+    try{g.save(); if(F.w<0){g.translate(x0+w,0);g.scale(-1,1);g.drawImage(m.el,0,F.y,w,F.h);} else g.drawImage(m.el,F.x,F.y,F.w,F.h); g.restore();}catch(e){}
     g.fillStyle='rgba(0,0,0,.45)';g.beginPath();g.rect(F.x,F.y,F.w,F.h);
     const q=m.crop.map(c=>[F.x+c[0]*F.w,F.y+c[1]*F.h]);g.moveTo(q[0][0],q[0][1]);for(let i=3;i>=0;i--)g.lineTo(q[i][0],q[i][1]);g.closePath();g.fill('evenodd');}});
 cropEd.enabled=false;
@@ -2303,16 +2308,19 @@ function layoutStage(){
 const HINTS={
   map:'<span><kbd>Ziehen</kbd> Punkt / Fläche verschieben</span><span><kbd>Mausrad</kbd> skalieren · <kbd>Alt</kbd>+Rad drehen</span><span><kbd>Tab</kbd> Punkt wählen · <kbd>Pfeile</kbd> fein</span><span><kbd>I</kbd> Form · Bild · Biegen</span>',
   media:'<span><kbd>Klick</kbd> auf eine Fläche: gewählte Datei dort zeigen oder entfernen</span><span><kbd>Strg</kbd>+<kbd>V</kbd> Bild einfügen</span>',
-  crop:'<span><kbd>Ziehen</kbd> die 4 Ecken auf den gewünschten Ausschnitt – schräg fotografierte Bilder werden dabei entzerrt</span>',
+  crop:'<span><kbd>Ziehen</kbd> die 4 Ecken auf den gewünschten Ausschnitt – schräg fotografierte Bilder werden dabei entzerrt</span><span><kbd>Enter</kbd> oder „✓ Fertig“ schließt</span>',
 };
 function setTab(t){
   if(t==='crop'&&!M()){toast('Erst im Tab „Medien“ eine Datei auswählen.');return;}
+  if(t==='crop'&&tab!=='media'&&tab!=='crop') return; // Zuschneiden öffnet sich nur aus dem Tab „Medien“
+  $('tabCrop').style.display=t==='crop'?'':'none'; $('bCropDone').style.display=t==='crop'?'':'none';
   if(Draw.active&&t!=='map') Draw.stop();
   tab=t; document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('act',el.dataset.tab===t));
   ['map','media','crop'].forEach(k=>$('panel'+k[0].toUpperCase()+k.slice(1)).classList.toggle('show',k===t));
   mapEd.enabled=t==='map'&&!Draw.active; cropEd.enabled=t==='crop'; ov.style.cursor='default';
   $('stHints').innerHTML=HINTS[t];
-  if(t==='crop'){const m=M(); $('cropInfo').textContent='Zuschnitt für „'+m.name+'“. Die Ecken legen fest, welcher Teil auf den Flächen erscheint.';}
+  if(t==='crop'){const m=M(); $('tabCrop').textContent='Zuschneiden: '+m.name;
+    $('cropInfo').textContent='Zuschnitt für „'+m.name+'“. Die Ecken legen fest, welcher Teil auf den Flächen erscheint.'+(m.kind==='camera'?' Die Kamera wird gespiegelt gezeigt.':'')+' Mit „Fertig“ geht es zurück zu den Medien.';}
   updateInfo();
 }
 function applyLock(){
@@ -2409,6 +2417,7 @@ function handleKey(e,fromOut,toggleFS,showHint){
   const tag=(e.target&&e.target.tagName)||'';
   if(!fromOut&&(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA')&&e.key!=='Escape') return;
   if(!fromOut&&Draw.key(e)){e.preventDefault();return;}
+  if(!fromOut&&tab==='crop'&&e.key==='Enter'){setTab('media');e.preventDefault();return;}
   const k=e.key.toLowerCase();
   if(fromOut&&outEdit&&outEd.key(e)){e.preventDefault();return;}
   if(!fromOut&&(tab==='map'||tab==='crop')){const ed=tab==='map'?mapEd:cropEd; if(ed.key(e)){e.preventDefault(); if(tab==='map') surfaceChanged(L()); return;}}
@@ -2622,8 +2631,8 @@ $('tBg').addEventListener('input',withT(m=>{m.text.bgColor=$('tBg').value;m.text
 $('tUpper').onchange=withT(m=>{m.text.upper=$('tUpper').checked;});
 document.querySelectorAll('#tAlign button').forEach(b=>b.onclick=withT(m=>{m.text.align=b.dataset.v;document.querySelectorAll('#tAlign button').forEach(x=>x.classList.toggle('on',x===b));}));
 on('bCropReset',withM(m=>{if(guardLock())return;m.crop=FULL();saveLocal();}));
-on('bCropBack',()=>setTab('media'));
-document.querySelectorAll('.tab').forEach(el=>el.onclick=()=>setTab(el.dataset.tab));
+on('bCropDone',()=>setTab('media')); on('bCropDone2',()=>setTab('media'));
+document.querySelectorAll('.tab').forEach(el=>el.onclick=()=>{if(el.dataset.tab!=='crop') setTab(el.dataset.tab);});
 document.addEventListener('paste',e=>{
   const it=[...(e.clipboardData?.items||[])].find(i=>i.type.startsWith('image/'));
   if(it){e.preventDefault();importFile(it.getAsFile());}
