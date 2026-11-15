@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <!-- CSP: script-src enthaelt den sha256-Hash des Hauptskripts (das script-Element ohne Attribute). Nach jeder Aenderung daran neu berechnen, sonst startet die App nicht. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-9ATWaynKFzsWecbw8HNW88mdCUrfSC+K+W3gOgA3gEg='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src blob:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-wDeb+S/Rj7bR8Y8u3eikzkTXMeUU0BKtGVYhMTstTQY='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src blob:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ArtLoop Projection Studio</title>
 <meta name="description" content="Projection Mapping im Browser: Bilder, Videos, Kamera und Text auf Flächen, Kugeln und Würfel – mit Effekten, Loop-Export und Syphon.">
@@ -154,6 +154,7 @@ select.wide{flex:1;min-width:0}
       <div class="tab" data-tab="crop" id="tabCrop" style="display:none">Zuschneiden</div>
       <button class="btn sm pri" id="bCropDone" style="display:none;margin-left:6px">✓ Fertig</button>
       <div class="sp"></div>
+      <button class="btn sm" id="bClean" title="Vorschau ohne Punkte, Linien und Beschriftungen (P). Bearbeiten geht trotzdem weiter.">👁 Saubere Vorschau</button>
       <button class="btn sm" id="bGrid">Testgitter</button>
       <button class="btn sm" id="bEdges">Kanten-Ansicht</button>
       <button class="btn sm" id="bBlack">Schwarz</button>
@@ -574,13 +575,50 @@ function layerOutline(l){
   if(sh.t==='cube') return o.slice(0,6);
   return ellipseOut(o);
 }
+// Umriss mit runden Ecken, gerechnet im Beamerbild (nicht im verzerrten Bildraum). Echte Ecken werden erkannt,
+// auch wenn eine Kante aus vielen kurzen Stücken besteht (gebogen, gezeichnet); jede Ecke wird durch eine
+// tangentiale Kurve ersetzt, die nie über die halbe Strecke zur nächsten Ecke hinausgeht.
+function roundOutline(l){
+  const P=layerOutline(l), sh=l.shape;
+  if(!(l.round>0)||(sh&&(sh.t==='ellipse'||sh.t==='sphere'))||P.length<3) return P;
+  const a=outAspect(), Q=[];
+  for(const p of P){const q=[p[0]*a,p[1]],z=Q[Q.length-1]; if(!z||Math.hypot(q[0]-z[0],q[1]-z[1])>1e-6) Q.push(q);}
+  while(Q.length>3&&Math.hypot(Q[0][0]-Q[Q.length-1][0],Q[0][1]-Q[Q.length-1][1])<=1e-6) Q.pop();
+  const n=Q.length; if(n<3) return P;
+  const seg=[], s=[0];
+  for(let i=0;i<n;i++){const b=Q[(i+1)%n];seg.push(Math.hypot(b[0]-Q[i][0],b[1]-Q[i][1]));s.push(s[i]+seg[i]);}
+  const T=s[n];
+  const at=d=>{d=((d%T)+T)%T; let i=0; while(i<n-1&&s[i+1]<d) i++; const f=seg[i]?(d-s[i])/seg[i]:0, b=Q[(i+1)%n];
+    return [Q[i][0]+(b[0]-Q[i][0])*f,Q[i][1]+(b[1]-Q[i][1])*f];};
+  const turn=i=>{const p=Q[(i-1+n)%n],c=Q[i],q=Q[(i+1)%n];
+    const a1=Math.atan2(c[1]-p[1],c[0]-p[0]),a2=Math.atan2(q[1]-c[1],q[0]-c[0]); let d=Math.abs(a2-a1); if(d>Math.PI) d=2*Math.PI-d; return d;};
+  const C=[]; for(let i=0;i<n;i++){const t=turn(i); if(t>0.3) C.push({i,t});}
+  if(!C.length) return P;
+  const xs=Q.map(p=>p[0]), ys=Q.map(p=>p[1]);
+  const r=l.round*0.5*Math.min(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys));
+  const k=C.length;
+  C.forEach((c,j)=>{
+    const nx=C[(j+1)%k], pv=C[(j-1+k)%k];
+    const dn=k>1?((s[nx.i]-s[c.i])%T+T)%T||T:T, dp=k>1?((s[c.i]-s[pv.i])%T+T)%T||T:T;
+    c.d=Math.min(r*Math.tan(Math.min(c.t,2.8)/2),dn*0.5,dp*0.5);
+  });
+  const out=[], N=14;
+  C.forEach((c,j)=>{
+    const V=Q[c.i], A=at(s[c.i]-c.d), B=at(s[c.i]+c.d);
+    for(let m=0;m<=N;m++){const t=m/N,u=1-t; out.push([u*u*A[0]+2*u*t*V[0]+t*t*B[0],u*u*A[1]+2*u*t*V[1]+t*t*B[1]]);}
+    // Originalpunkte bis zur nächsten Ecke übernehmen (nur die außerhalb der Rundungen)
+    const nx=C[(j+1)%k], e0=s[c.i]+c.d, gap=((s[nx.i]-s[c.i])%T+T)%T||T, e1=s[c.i]+gap-nx.d;
+    for(let m=1;m<n;m++){const vi=(c.i+m)%n; if(vi===nx.i) break; const dv=s[c.i]+((s[vi]-s[c.i])%T+T)%T; if(dv>e0+1e-9&&dv<e1-1e-9) out.push(Q[vi]);}
+  });
+  return out.map(p=>[p[0]/a,p[1]]);
+}
 // Teilflächen, die gezeichnet werden: je eine Homographie Einheitsquadrat → Beamerbild
 function surfPatches(l,override){
   if(override) return [{H:sq2quad(override),mode:0,dark:0,bend:null,round:0,soft:0,aa:1}];
   const sh=l.shape;
   if(sh&&sh.t==='sphere') return [{H:sq2quad(shapeCtrlOut(l)),mode:1,dark:0,round:0,soft:l.soft,aa:1}];
   if(sh&&sh.t==='cube') return cubeFaces(shapeCtrlOut(l)).map((f,i)=>({H:sq2quad(f),mode:0,dark:[0,.25,.45][i]*l.shade,round:0,soft:0,aa:0}));
-  return [{H:sq2quad(l.corners),mode:0,dark:0,bend:l.bend,round:sh?0:l.round,soft:sh?0:l.soft,aa:1}];
+  return [{H:sq2quad(l.corners),mode:0,dark:0,bend:l.bend,round:0,soft:needsShapeMask(l)?0:l.soft,aa:1}];
 }
 // Neue Form mittig im Bild, im Beamerbild wirklich rund bzw. regelmäßig (nicht mit dem Bildformat verzerrt)
 function makeForm(l,kind){
@@ -624,27 +662,13 @@ function cleanShape(s){
   return o;
 }
 function cleanCut(c){return c==='overlap'||c==='hole'||c==='only'?c:'none';}
-function pathRounded(g,P,r){
-  const n=P.length; g.beginPath();
-  if(!(r>0)||n<3){P.forEach(p=>g.lineTo(p[0],p[1]));g.closePath();return;}
-  const s=[(P[n-1][0]+P[0][0])/2,(P[n-1][1]+P[0][1])/2]; g.moveTo(s[0],s[1]);
-  for(let i=0;i<n;i++){const a=P[i],b=P[(i+1)%n],q=P[(i-1+n)%n];
-    const rr=Math.min(r,Math.hypot(a[0]-q[0],a[1]-q[1])/2,Math.hypot(b[0]-a[0],b[1]-a[1])/2);
-    g.arcTo(a[0],a[1],b[0],b[1],rr);}
-  g.closePath();
-}
-// Umriss als Canvas-Pfad, bei Vielecken mit runden Ecken
+// Umriss als Canvas-Pfad (mit runden Ecken, falls eingestellt)
 function traceSurface(g,l,W,H){
-  const P=layerOutline(l).map(p=>[p[0]*W,p[1]*H]);
-  let r=0;
-  if(l.round>0&&(l.shape?(l.shape.t==='poly'||l.shape.t==='cube'):!l.bend)){
-    const xs=P.map(p=>p[0]),ys=P.map(p=>p[1]);
-    r=l.round*0.5*Math.min(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys));
-  }
-  pathRounded(g,P,r);
+  const P=roundOutline(l); g.beginPath(); P.forEach(p=>g.lineTo(p[0]*W,p[1]*H)); g.closePath();
 }
-// Kreis und Vieleck brauchen immer eine Maske, der Würfel nur für weiche Kanten oder runde Ecken (Viereck und Kugel rechnet der Shader)
-const needsShapeMask=l=>!!(l.shape&&(l.shape.t==='ellipse'||l.shape.t==='poly'||(l.shape.t==='cube'&&(l.soft>0||l.round>0))));
+// Kreis und Vieleck brauchen immer eine Maske, Viereck und Würfel nur für runde Ecken (der Würfel auch für weiche Kanten).
+// Weiche Kanten ohne Rundung rechnet beim Viereck und bei der Kugel der Shader.
+const needsShapeMask=l=>l.shape?(l.shape.t==='ellipse'||l.shape.t==='poly'||(l.shape.t==='cube'&&(l.soft>0||l.round>0))):l.round>0;
 
 /* ---------- Shader ---------- */
 const VS = `#version 300 es
@@ -1136,7 +1160,7 @@ class Renderer{
       g.fillStyle='#fff'; traceSurface(g,l,W,H); g.fill();
       g.globalCompositeOperation='destination-out';
       if(needsShapeMask(l)&&l.soft>0){ // „Kante weich“ folgt der Form
-        const o=layerOutline(l), xs=o.map(p=>p[0]*W), ys=o.map(p=>p[1]*H);
+        const o=roundOutline(l), xs=o.map(p=>p[0]*W), ys=o.map(p=>p[1]*H);
         const size=Math.min(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys)), N=12;
         g.strokeStyle='#000'; traceSurface(g,l,W,H);
         for(let k=N;k>=1;k--){g.globalAlpha=1/k;g.lineWidth=2*l.soft*0.25*size*k/N;g.stroke();}
@@ -1216,7 +1240,7 @@ class CornerEditor{
   }
   keepForm(){const l=this.lay();return !!(l&&l.shape&&!BODY(l.shape.t)&&this.mode()==='corner');}
   handles(){const m=this.mode(),l=this.lay();return m==='form'?shapeCtrlOut(l):m==='bend'?bendOut(l):this.o.get();}
-  body(){const l=this.lay();return (l?layerOutline(l):this.o.get()).map(c=>this.px(c));}
+  body(){const l=this.lay();return (l?roundOutline(l):this.o.get()).map(c=>this.px(c));}
   inside(p,q){let ins=false;for(let i=0,j=q.length-1;i<q.length;j=i++){const a=q[i],b=q[j];
     if(((a[1]>p[1])!==(b[1]>p[1]))&&(p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])) ins=!ins;} return ins;}
   pickAt(p){
@@ -2239,7 +2263,7 @@ let prev=null;
 try{ prev=new Renderer(pv,.6);}catch(e){alert('WebGL2 nicht verfügbar: '+e.message+'\nBitte aktuellen Chrome, Edge, Safari oder Firefox verwenden.');}
 let tab='map';
 let FRAME={x:0,y:0,w:10,h:10};
-const otherLayers=()=>S.layers.map((l,i)=>({outline:layerOutline(l),hole:l.cut==='hole',empty:l.cut!=='hole'&&!surfaceMedia(l).length,idx:i,name:l.name,vis:l.visible}))
+const otherLayers=()=>S.layers.map((l,i)=>({outline:roundOutline(l),hole:l.cut==='hole',empty:l.cut!=='hole'&&!surfaceMedia(l).length,idx:i,name:l.name,vis:l.visible}))
   .filter(o=>o.idx!==S.sel&&o.vis);
 const layerEd=()=>({get:()=>S.corners,set:c=>{S.corners=c;saveLocal();},layer:L,
   setKeep:(n,form)=>{setKeepForm(L(),n,form);saveLocal();}, setForm:q=>{setFormOut(L(),q);saveLocal();}, setBend:q=>{setBendOut(L(),q);saveLocal();},
@@ -2263,7 +2287,7 @@ cropEd.enabled=false;
 // Tab „Medien“: Flächen anklicken, um die gewählte Datei dort zu zeigen
 const Assign={hover:-1,
   hit(e){ const p=mapEd.pt(e); for(let i=S.layers.length-1;i>=0;i--){const l=S.layers[i]; if(!l.visible||l.cut==='hole') continue;
-    if(mapEd.inside(p,layerOutline(l).map(c=>mapEd.px(c)))) return i;} return -1; },
+    if(mapEd.inside(p,roundOutline(l).map(c=>mapEd.px(c)))) return i;} return -1; },
   down(e){ if(tab!=='media') return; const i=this.hit(e); if(i<0) return; const m=M();
     if(!m){toast('Erst rechts eine Datei auswählen oder importieren.');return;} toggleAssign(S.layers[i],m); },
   move(e){ if(tab!=='media') return; this.hover=this.hit(e); ov.style.cursor=this.hover>=0?'pointer':'default'; },
@@ -2273,7 +2297,7 @@ const Assign={hover:-1,
     g.font=`${11*d}px system-ui`; g.textBaseline='bottom'; g.textAlign='left'; g.fillStyle='rgba(255,255,255,.5)';
     g.fillText(m?'Klick auf eine Fläche: „'+m.name+'“ dort zeigen / entfernen':'Rechts eine Datei wählen',F.x,F.y-4*d);
     S.layers.forEach((l,i)=>{ if(!l.visible) return;
-      const op=layerOutline(l).map(c=>mapEd.px(c)), on=m&&l.media.includes(m.id), hv=i===this.hover;
+      const op=roundOutline(l).map(c=>mapEd.px(c)), on=m&&l.media.includes(m.id), hv=i===this.hover;
       g.beginPath(); op.forEach(p=>g.lineTo(p[0],p[1])); g.closePath();
       if(l.cut==='hole'){g.fillStyle='rgba(255,90,80,.16)';g.fill();}
       else if(on){g.fillStyle=hv?'rgba(63,240,255,.28)':'rgba(63,240,255,.16)';g.fill();}
@@ -2306,8 +2330,8 @@ function layoutStage(){
   pv.style.visibility = tab==='crop'?'hidden':'visible';
 }
 const HINTS={
-  map:'<span><kbd>Ziehen</kbd> Punkt / Fläche verschieben</span><span><kbd>Mausrad</kbd> skalieren · <kbd>Alt</kbd>+Rad drehen</span><span><kbd>Tab</kbd> Punkt wählen · <kbd>Pfeile</kbd> fein</span><span><kbd>I</kbd> Form · Bild · Biegen</span>',
-  media:'<span><kbd>Klick</kbd> auf eine Fläche: gewählte Datei dort zeigen oder entfernen</span><span><kbd>Strg</kbd>+<kbd>V</kbd> Bild einfügen</span>',
+  map:'<span><kbd>Ziehen</kbd> Punkt / Fläche verschieben</span><span><kbd>Mausrad</kbd> skalieren · <kbd>Alt</kbd>+Rad drehen</span><span><kbd>Tab</kbd> Punkt wählen · <kbd>Pfeile</kbd> fein</span><span><kbd>I</kbd> Form · Bild · Biegen</span><span><kbd>P</kbd> Vorschau ohne Hilfslinien</span>',
+  media:'<span><kbd>Klick</kbd> auf eine Fläche: gewählte Datei dort zeigen oder entfernen</span><span><kbd>P</kbd> Vorschau ohne Hilfslinien</span><span><kbd>Strg</kbd>+<kbd>V</kbd> Bild einfügen</span>',
   crop:'<span><kbd>Ziehen</kbd> die 4 Ecken auf den gewünschten Ausschnitt – schräg fotografierte Bilder werden dabei entzerrt</span><span><kbd>Enter</kbd> oder „✓ Fertig“ schließt</span>',
 };
 function setTab(t){
@@ -2346,9 +2370,10 @@ function frame(){
   layoutStage();
   const ph=phaseNow();
   if(prev && tab!=='crop') prev.render(ph,{grid:S.grid,black:S.black,view:S.edgesView});
-  if(tab==='map'){ mapEd.draw(); if(Draw.active) Draw.draw(); }
-  else if(tab==='media') Assign.draw();
-  else cropEd.draw();
+  if(S.clean&&tab!=='crop'&&!Draw.active){ if(!S.cleanDrawn){ov.getContext('2d').clearRect(0,0,ov.width,ov.height);S.cleanDrawn=true;} }
+  else if(tab==='map'){ S.cleanDrawn=false; mapEd.draw(); if(Draw.active) Draw.draw(); }
+  else if(tab==='media'){ S.cleanDrawn=false; Assign.draw(); }
+  else { S.cleanDrawn=false; cropEd.draw(); }
   requestAnimationFrame(frame);
 }
 
@@ -2426,6 +2451,7 @@ function handleKey(e,fromOut,toggleFS,showHint){
   else if(k==='b'){toggleBlack();}
   else if(k===' '){togglePlay();e.preventDefault();}
   else if(k==='i'&&!S.locked){cycleEdit();}
+  else if(k==='p'&&!fromOut){toggleClean();}
   else if(k==='e'&&S.locked){ guardLock(); if(fromOut&&showHint) showHint(1500); }
   else if(k==='e'){ if(fromOut){setOutEdit(!outEdit);showHint&&showHint(2500);} else if(outWin&&!outWin.closed){setOutEdit(!outEdit);toast(outEdit?'Punkte-Bearbeitung im Beamerbild an':'Punkte-Bearbeitung im Beamerbild aus');} }
   else if(k==='f'&&fromOut){toggleFS();}
@@ -2435,6 +2461,8 @@ function handleKey(e,fromOut,toggleFS,showHint){
 document.addEventListener('keydown',e=>handleKey(e,false));
 
 function toggleGrid(){S.grid=!S.grid;$('bGrid').classList.toggle('on',S.grid);}
+// Saubere Vorschau: Punkte, Linien und Beschriftungen ausblenden – Bearbeiten (Ziehen, Pfeile, Rad) geht weiter
+function toggleClean(){S.clean=!S.clean;S.cleanDrawn=false;$('bClean').classList.toggle('on',S.clean);$('bClean').textContent=S.clean?'✎ Hilfslinien zeigen':'👁 Saubere Vorschau';}
 function toggleBlack(){S.black=!S.black;$('bBlack').classList.toggle('on',S.black);}
 function togglePlay(){
   if(S.playing){S.pausePhase=phaseNow();S.playing=false;}else{S.t0=performance.now()-S.pausePhase*S.loopLen*1000;S.playing=true;}
@@ -2578,7 +2606,7 @@ const on=(id,f)=>{$(id).onclick=f;};
 $('file').addEventListener('change',e=>{importFiles([...(e.target.files||[])]);e.target.value='';});
 $('tFontFile').addEventListener('change',e=>{addFontFile(e.target.files&&e.target.files[0]);e.target.value='';});
 on('bLock',toggleLock); on('bOut',openOutput); on('bPlay',togglePlay); on('bReset',resetAll);
-on('bGrid',toggleGrid); on('bBlack',toggleBlack);
+on('bGrid',toggleGrid); on('bClean',toggleClean); on('bBlack',toggleBlack);
 on('bEdges',()=>{S.edgesView=!S.edgesView;$('bEdges').classList.toggle('on',S.edgesView);});
 on('bExport',openExport); on('exGo',runExport);
 on('exCancel',()=>{if(exporting){exCancel=true;}else $('mExport').classList.remove('show');});
