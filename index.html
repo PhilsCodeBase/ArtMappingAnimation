@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <!-- CSP: script-src enthaelt den sha256-Hash des Hauptskripts (das script-Element ohne Attribute). Nach jeder Aenderung daran neu berechnen, sonst startet die App nicht. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-BfWXYOeoz9YfvSmf6RSGpZlKmhJYNmWyB/pThSoqzWw=' 'sha256-Tqnmo80xhXnwJWticHdOyTa1tk7xp7wsa0sbMwmntPg='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src blob:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-sQIEsUG9D6Th7dFzXJrpAKTsg11j8qozpfYIx3RSM40=' 'sha256-Tqnmo80xhXnwJWticHdOyTa1tk7xp7wsa0sbMwmntPg='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src blob:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ArtLoop Projection Studio</title>
 <meta name="description" content="Projection Mapping im Browser: Bilder, Videos, Kamera und Text auf Flächen, Kugeln und Würfel – mit Effekten, Loop-Export und Syphon.">
@@ -128,6 +128,17 @@ select.wide{flex:1;min-width:0}
 #stHints{display:contents}
 .layer .badge{margin-left:-2px}
 .btn.on{border-color:var(--acc);color:var(--acc)}
+.mrow{display:flex;align-items:center;gap:6px;padding:5px 6px;border:1px solid var(--line);border-radius:8px;margin-bottom:5px;background:var(--panel2)}
+.mrow.act{border-color:var(--acc)}
+.mrow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.mrow .src{font-size:11px;color:var(--mute);white-space:nowrap}
+.mrow .src.on{color:var(--ok)}
+.mrow.learn{border-color:var(--warn)}
+.mrow.learn .src{color:var(--warn)}
+.mrow .ib{background:none;border:none;color:var(--mute);cursor:pointer;padding:2px 3px;font-size:13px;line-height:1}
+.mrow .ib:hover{color:var(--text)}
+.mrow.live{border-color:var(--ok);background:#16301f}
+#bVj.on{border-color:var(--ok);color:var(--ok)}
 </style>
 </head>
 <body>
@@ -138,6 +149,7 @@ select.wide{flex:1;min-width:0}
   <button class="btn pri" id="bOut"><span class="outdot" id="outDot"></span><span>Beamer-Ausgabe öffnen</span></button>
   <button class="btn" id="bSy"><span class="outdot" id="syDot"></span><span>Syphon</span></button>
   <button class="btn" id="bPlay">❚❚ Pause</button>
+  <button class="btn" id="bVj" title="VJ-Modus: Pads, Regler und Pedal am MIDI-Gerät steuern die Ausgabe live">🎛 VJ-Modus: aus</button>
   <button class="btn" id="bLock" title="Mapping sperren / entsperren">🔓 Mapping offen</button>
   <button class="btn" id="bReset" title="Alle Look-Regler der gewählten Fläche zurücksetzen – Farben, Inhalte und Mapping bleiben">↺ Looks</button>
   <button class="btn" id="bExport">Loop exportieren</button>
@@ -151,6 +163,8 @@ select.wide{flex:1;min-width:0}
     <div class="tabs">
       <div class="tab act" data-tab="map">Mapping</div>
       <div class="tab" data-tab="media">Medien</div>
+      <div class="tab" data-tab="scenes">Szenen</div>
+      <div class="tab" data-tab="vj">VJ / MIDI</div>
       <div class="tab" data-tab="crop" id="tabCrop" style="display:none">Zuschneiden</div>
       <button class="btn sm pri" id="bCropDone" style="display:none;margin-left:6px">✓ Fertig</button>
       <div class="sp"></div>
@@ -216,7 +230,7 @@ select.wide{flex:1;min-width:0}
     </div>
     <div class="panel" id="panelMedia">
       <div class="box">
-        <h4 class="hrow">Medien <span><label class="btn sm" for="file">+ Datei</label> <button class="btn sm" id="bAddCam">+ Kamera</button> <button class="btn sm" id="bAddText">+ Text</button></span></h4>
+        <h4 class="hrow">Medien <span><label class="btn sm" for="file">+ Datei</label> <button class="btn sm" id="bAddCam">+ Kamera</button> <button class="btn sm" id="bAddText">+ Text</button> <button class="btn sm" id="bAddColor" title="Einfarbige Fläche mit frei wählbarer Farbe">+ Farbe</button></span></h4>
         <div id="mediaList"></div>
         <div class="hint" style="margin:4px 0 0">Datei wählen, dann im Bild links auf Flächen klicken: dort läuft sie. Nochmal klicken nimmt sie weg. Oben liegt vorne.</div>
       </div>
@@ -238,12 +252,38 @@ select.wide{flex:1;min-width:0}
           <div class="frow"><label>Farbe <input type="color" id="tColor"></label><label><input type="checkbox" id="tBgOn"> Hintergrund</label><input type="color" id="tBg"></div>
           <div class="frow"><span class="seg" id="tAlign"><button data-v="left">Links</button><button data-v="center">Mitte</button><button data-v="right">Rechts</button></span><label><input type="checkbox" id="tUpper"> GROSS</label></div>
           <div id="tRows"></div></div>
+        <div class="box" id="mpColor"><h4>Farbfläche</h4>
+          <div class="frow"><label>Farbe <input type="color" id="mColor"></label></div>
+          <div class="chips" id="mColorSw"></div>
+          <div class="hint" style="margin:6px 0 0">Eine einfarbige Fläche – z. B. als Hintergrund unter anderen Medien oder als Farbblitz im VJ-Modus.</div></div>
         <div class="box"><h4 class="hrow">Bild <button class="btn sm" id="bMReset">Alles zurücksetzen</button></h4>
           <div class="frow"><span class="seg" id="fitSeg"><button data-v="cover">Fläche füllen</button><button data-v="contain">Ganz zeigen</button></span></div>
           <div class="btnrow"><button class="btn sm" id="bMFlipH">Spiegeln ↔</button><button class="btn sm" id="bMFlipV">Spiegeln ↕</button><button class="btn sm" id="bMRotL">↺ 90°</button><button class="btn sm" id="bMRotR">↻ 90°</button><button class="btn sm" id="bMCrop">Zuschneiden …</button></div>
           <div id="mpXfRows"></div></div>
-        <div class="box"><h4>Effekte</h4><div class="hint">↺ oder Doppelklick setzt einen Regler zurück.</div><div id="mpFxRows"></div></div>
+        <div class="box"><h4>Effekte</h4>
+          <div class="btnrow"><button class="btn sm" id="bMInv" title="Einmal drücken: invertiert. Nochmal drücken: wieder normal.">Invertieren</button><button class="btn sm" id="bMBw" title="Einmal drücken: schwarzweiß. Nochmal drücken: wieder Farbe.">Schwarzweiß</button></div>
+          <div class="hint">↺ oder Doppelklick setzt einen Regler zurück.</div><div id="mpFxRows"></div></div>
       </div>
+    </div>
+    <div class="panel" id="panelScenes">
+      <div class="box">
+        <h4 class="hrow">Szenen <button class="btn sm pri" id="bSceneAdd">+ Aktuellen Stand speichern</button></h4>
+        <div class="hint">Eine Szene merkt sich alle Flächen mit Form, Position, Biegung, Looks und welche Medien wo laufen – dazu die Einstellungen der Medien. Zum Umschalten: Zeile anklicken, Taste <b>1–9</b> oder ein Pad am MIDI-Gerät (Tab „VJ / MIDI“).</div>
+        <div id="sceneList"></div>
+      </div>
+    </div>
+    <div class="panel" id="panelVj">
+      <div class="box">
+        <h4 class="hrow">VJ-Modus <button class="btn sm" id="bVj2">Einschalten</button></h4>
+        <div class="hint" id="vjStatus"></div>
+        <div class="hint" id="vjLast" style="margin-top:-4px"></div>
+        <div class="hint">Zuordnen: bei einer Zeile auf „Lernen“ klicken, dann das Pad bzw. den Regler am Gerät bewegen. Die Zuordnung bleibt in diesem Browser gespeichert. Esc bricht ab. Regler und Tasten wirken auf das Medium, dessen Pad zuletzt gedrückt wurde (oder das im Tab „Medien“ gewählte).</div>
+      </div>
+      <div class="box"><h4>Pads: Medium nur sichtbar, solange gedrückt</h4><div class="hint">Medien ohne Pad bleiben wie gewohnt sichtbar. Mit gehaltenem Sustain-Pedal bleiben losgelassene Pads an, bis das Pedal losgelassen wird.</div><div id="vjPads"></div></div>
+      <div class="box"><h4>Regler (für das aktuelle Medium)</h4><div id="vjKnobs"></div></div>
+      <div class="box"><h4>Tasten</h4><div id="vjBtns"></div></div>
+      <div class="box"><h4>Szenen aufrufen</h4><div id="vjScenes"></div></div>
+      <div class="box"><button class="btn sm" id="bVjClear">Alle Zuordnungen löschen</button></div>
     </div>
     <div class="panel" id="panelCrop">
       <div class="box"><h4>Zuschneiden</h4><div class="hint" id="cropInfo"></div>
@@ -406,6 +446,7 @@ const MP=[
  {k:'speed',l:'Geschwindigkeit',min:.25,max:2,step:.05,def:1,fmt:v=>v.toFixed(2)+'×',g:'play'},
 ];
 const MDEF={}; MP.forEach(r=>MDEF[r.k]=r.def);
+const TOGGLES=['inv','bw']; // keine Regler, sondern Buttons (an/aus)
 const TR=[
  {k:'size',l:'Schriftgröße',min:16,max:600,step:1,def:140,fmt:v=>Math.round(v)+' px'},
  {k:'weight',l:'Stärke',min:100,max:900,step:100,def:700,fmt:v=>String(Math.round(v))},
@@ -486,8 +527,10 @@ function newLayer(o){return Object.assign({id:LAYER_ID++,name:'Fläche',p:{...DE
   srcVersion:0,edgeVersion:0,rectW:1000,rectH:1000},o||{});}
 // Medium (Bild, Video, Kamera, Text). el = Quelle fürs Rendern, blob = Originaldatei
 function newMedia(o){return Object.assign({id:MEDIA_ID++,kind:'image',name:'Datei',visible:true,p:{...MDEF},flipH:false,flipV:false,crop:FULL(),
-  fit:'cover',paused:false,muted:true,text:null,isDemo:false,dev:'',el:null,blob:null,url:null,stream:null,ver:0,missing:false},o||{});}
+  fit:'cover',paused:false,muted:true,text:null,color:'#ff3b30',isDemo:false,dev:'',el:null,blob:null,url:null,stream:null,ver:0,missing:false},o||{});}
+let SCENE_ID=1, SCENE_EV=1e6;
 const S = {
+  scenes:[], scene:0,
   colors:{...DEF_COLORS}, swatches:[...DEF_SWATCHES], activeColor:'trC1',
   layers:[], sel:0, media:[], msel:-1, fonts:[], locked:false, loopLen:8, maxSize:1600,
   grid:false, edgesView:false, black:false, edit:'form',
@@ -999,7 +1042,7 @@ void main(){
 }`;
 
 /* ---------- Renderer (eine Instanz pro Fenster / Canvas) ---------- */
-function surfaceMedia(l){ return S.media.filter(m=>m.visible&&m.el&&l.media.includes(m.id)); }
+function surfaceMedia(l){ return S.media.filter(m=>m.visible&&m.el&&l.media.includes(m.id)&&vjShow(m)); }
 function mediaDims(m){ const el=m.el; if(!el) return [16,9];
   if(m.kind==='video'||m.kind==='camera') return [el.videoWidth||16,el.videoHeight||9]; return [el.width||1,el.height||1]; }
 function mediaAspect(m){
@@ -1893,6 +1936,17 @@ function renderText(m){
   lines.forEach((x2,i)=>g.fillText(x2,x,pad+lh*(i+.5)));
   m.el=c; m.ver++;
 }
+// Einfarbige Fläche: kleines Canvas in der gewählten Farbe, wird wie ein Bild gerendert
+function renderColor(m){
+  const c=(m.el&&m.el.tagName==='CANVAS')?m.el:document.createElement('canvas');
+  c.width=c.height=32; const g=c.getContext('2d'); g.fillStyle=m.color; g.fillRect(0,0,32,32);
+  m.el=c; m.ver++;
+}
+function addColor(){
+  const n=S.media.filter(m=>m.kind==='color').length+1;
+  const m=newMedia({kind:'color',name:'Farbe '+n,color:'#ff3b30'}); renderColor(m); addMedia(m); if(tab!=='media') setTab('media');
+  toast('Farbfläche angelegt – Farbe rechts wählen, dann die Fläche anklicken.');
+}
 async function registerFont(id,blob){
   try{ const ff=new FontFace('ALF'+id,await blob.arrayBuffer()); await ff.load(); document.fonts.add(ff); return true; }catch(e){ return false; }
 }
@@ -1964,7 +2018,10 @@ async function importFile(f){
   S.media.push(m); S.msel=S.media.length-1;
   // Erste eigene Datei ersetzt das Beispielbild
   const demo=S.media.find(x=>x.isDemo);
-  if(demo&&S.media.filter(x=>!x.isDemo).length===1){ S.layers.forEach(l=>{l.media=l.media.map(id=>id===demo.id?m.id:id);}); removeMedia(demo,true); S.msel=S.media.indexOf(m); }
+  if(demo&&S.media.filter(x=>!x.isDemo).length===1){ S.layers.forEach(l=>{l.media=l.media.map(id=>id===demo.id?m.id:id);
+      // Ein früher gespeicherter, unveränderter Start-Look soll das eigene Material nicht mehr verfremden
+      if(l.look==='Sanft lebendig'){ l.p={...DEF}; l.look=null; l.edgeVersion++; } });
+    removeMedia(demo,true); S.msel=S.media.indexOf(m); refreshInputs(); markLook(); }
   renderMedia(); refreshMediaUI(); renderLayers(); saveLocal();
   if(tab!=='media') setTab('media');
   toast('„'+m.name+'“ importiert. Jetzt im Bild auf die Flächen klicken, auf denen es laufen soll.',5000);
@@ -1982,7 +2039,7 @@ function moveMedia(i,dir){
   if(S.msel===i) S.msel=j; else if(S.msel===j) S.msel=i;
   renderMedia(); renderLayers(); saveLocal();
 }
-function selectMedia(i){ S.msel=i; renderMedia(); refreshMediaUI(); fillCameraList(); saveLocal(); }
+function selectMedia(i){ S.msel=i; VJ.cur=0; renderMedia(); refreshMediaUI(); fillCameraList(); saveLocal(); }
 function toggleAssign(l,m){
   if(l.cut==='hole'){toast('Loch-Flächen zeigen nie Inhalt.');return;}
   const on=l.media.includes(m.id);
@@ -1990,7 +2047,7 @@ function toggleAssign(l,m){
   renderMedia(); refreshMediaUI(); renderLayers(); saveLocal();
   toast((on?'Entfernt von „':'Läuft jetzt auf „')+l.name+'“');
 }
-const KIND={image:'Bild',video:'Video',camera:'Kamera',text:'Text'};
+const KIND={image:'Bild',video:'Video',camera:'Kamera',text:'Text',color:'Farbe'};
 function renderMedia(){
   const box=$('mediaList'); if(!box) return; box.innerHTML='';
   if(!S.media.length){ box.innerHTML='<div class="hint">Noch keine Dateien. Oben „+ Datei“ für Bilder und Videos.</div>'; return; }
@@ -2034,7 +2091,7 @@ function setMParam(k,v){ const m=M(); if(!m) return; m.p[k]=v; if(k==='speed') s
 function setTParam(k,v){ const m=M(); if(!m||m.kind!=='text') return; m.text[k]=v; renderText(m); }
 function setSurfParam(k,v){ const l=L(); l[k]=v; }
 function buildMediaControls(){
-  const add=(id,g)=>MP.filter(r=>r.g===g).forEach(r=>{const s=mkSlider(r,setMParam);MS[r.k]=s;$(id).appendChild(s.el);});
+  const add=(id,g)=>MP.filter(r=>r.g===g&&!TOGGLES.includes(r.k)).forEach(r=>{const s=mkSlider(r,setMParam);MS[r.k]=s;$(id).appendChild(s.el);});
   add('mpXfRows','xf'); add('mpFxRows','fx'); add('mpPlayRows','play');
   TR.forEach(r=>{const s=mkSlider(r,setTParam);TS[r.k]=s;$('tRows').appendChild(s.el);});
   SR.forEach(r=>{const s=mkSlider(r,setSurfParam);SS[r.k]=s;$('surfRows').appendChild(s.el);});
@@ -2044,8 +2101,12 @@ function refreshMediaUI(){
   $('mediaProps').style.display=m?'':'none'; $('mediaEmpty').style.display=m?'none':'';
   if(!m) return;
   const show=(id,on)=>{$(id).style.display=on?'':'none';};
-  show('mpPlay',m.kind==='video'); show('mpCam',m.kind==='camera'); show('mpText',m.kind==='text');
+  show('mpPlay',m.kind==='video'); show('mpCam',m.kind==='camera'); show('mpText',m.kind==='text'); show('mpColor',m.kind==='color');
   for(const k in MS) MS[k].set(m.p[k]);
+  $('bMInv').classList.toggle('on',m.p.inv>=.5); $('bMBw').classList.toggle('on',m.p.bw>=.5);
+  if(m.kind==='color'){ $('mColor').value=m.color;
+    $('mColorSw').innerHTML=''; S.swatches.slice(0,12).forEach(c=>{const s=document.createElement('span');s.className='chip';s.style.background=c;s.style.width='22px';s.style.height='22px';s.style.padding='0';s.title=c;
+      s.onclick=()=>{m.color=c;renderColor(m);$('mColor').value=c;saveLocal();};$('mColorSw').appendChild(s);}); }
   $('bMPlay').textContent=m.paused?'▶ Abspielen':'❚❚ Pause'; $('bMMute').textContent=m.muted?'🔇 Ton aus':'🔊 Ton an';
   $('bMFlipH').classList.toggle('on',m.flipH); $('bMFlipV').classList.toggle('on',m.flipV);
   document.querySelectorAll('#fitSeg button').forEach(b=>b.classList.toggle('on',b.dataset.v===m.fit));
@@ -2063,6 +2124,7 @@ function refreshMediaUI(){
     c.onclick=()=>toggleAssign(l,m); box.appendChild(c); });
   if(!box.children.length) box.innerHTML='<span class="hint">Noch keine Flächen – im Tab „Mapping“ anlegen.</span>';
 }
+function toggleMedia(m,k){ m.p[k]=m.p[k]>=.5?0:1; if(M()===m) refreshMediaUI(); saveLocal(); }
 function resetMedia(){
   const m=M(); if(!m) return;
   m.p={...MDEF}; m.flipH=false; m.flipV=false; m.crop=FULL(); m.fit=m.kind==='text'?'contain':'cover';
@@ -2078,8 +2140,8 @@ const IDB={db:null,
 function surfMeta(l){return {id:l.id,name:l.name,p:l.p,corners:l.corners,home:l.home,shape:l.shape,cut:l.cut,round:l.round,soft:l.soft,bend:l.bend,
   spin:l.spin,shade:l.shade,media:l.media,visible:l.visible,look:l.look};}
 function mediaMeta(m){return {id:m.id,kind:m.kind,name:m.name,visible:m.visible,p:m.p,flipH:m.flipH,flipV:m.flipV,crop:m.crop,fit:m.fit,
-  paused:m.paused,muted:m.muted,text:m.text,isDemo:m.isDemo,dev:m.dev};}
-function stateMeta(){return {layers:S.layers.map(surfMeta),media:S.media.map(mediaMeta),fonts:S.fonts.map(f=>({id:f.id,name:f.name})),
+  paused:m.paused,muted:m.muted,text:m.text,color:m.color,isDemo:m.isDemo,dev:m.dev};}
+function stateMeta(){return {layers:S.layers.map(surfMeta),media:S.media.map(mediaMeta),scenes:S.scenes,fonts:S.fonts.map(f=>({id:f.id,name:f.name})),
   sel:S.sel,msel:S.msel,locked:S.locked,loopLen:S.loopLen,colors:S.colors,swatches:S.swatches,outAspect:S.outAspect};}
 function saveLocal(){
   clearTimeout(saveLocal._t);
@@ -2102,12 +2164,13 @@ function cleanText(t){
 }
 function cleanMedia(o){
   if(!o||typeof o!=='object') return null;
-  const kind=['image','video','camera','text'].includes(o.kind)?o.kind:null, id=cleanId(o.id); if(!kind||!id) return null;
+  const kind=['image','video','camera','text','color'].includes(o.kind)?o.kind:null, id=cleanId(o.id); if(!kind||!id) return null;
   const p={...MDEF}; MP.forEach(r=>{p[r.k]=cleanNum(o.p&&o.p[r.k],r.min,r.max,r.def);});
+  TOGGLES.forEach(k=>{p[k]=p[k]>=.5?1:0;}); // Invertieren / Schwarzweiß sind Schalter
   const crop=cleanPts(o.crop,4,4);
   return newMedia({id,kind,name:cleanStr(o.name,'Datei',200)||'Datei',visible:o.visible!==false,p,flipH:!!o.flipH,flipV:!!o.flipV,
     crop:crop?crop.map(c=>[Math.min(1,Math.max(0,c[0])),Math.min(1,Math.max(0,c[1]))]):FULL(),fit:o.fit==='contain'?'contain':'cover',
-    paused:!!o.paused,muted:o.muted!==false,isDemo:!!o.isDemo&&kind==='image',dev:cleanStr(o.dev,'',300),text:kind==='text'?cleanText(o.text):null});
+    paused:!!o.paused,muted:o.muted!==false,isDemo:!!o.isDemo&&kind==='image',dev:cleanStr(o.dev,'',300),text:kind==='text'?cleanText(o.text):null,color:cleanColor(o.color,'#ff3b30')});
 }
 function cleanSurface(o){
   if(!o||typeof o!=='object') return null;
@@ -2130,6 +2193,8 @@ function applyState(j,getBlob){
   layers.forEach(l=>{l.media=l.media.filter(id=>ids.has(id));});
   const fonts=(Array.isArray(j.fonts)?j.fonts:[]).slice(0,50).map(f=>f&&({id:cleanId(f.id),name:cleanStr(f.name,'Schrift',60)})).filter(f=>f&&f.id);
   S.media=media; S.layers=layers; S.fonts=fonts.map(f=>({...f,blob:null}));
+  S.scenes=uniq((Array.isArray(j.scenes)?j.scenes:[]).slice(0,200).map(cleanScene)); S.scene=0;
+  SCENE_ID=Math.max(SCENE_ID,0,...S.scenes.map(s=>s.id))+1;
   if(!S.layers.length){ const nl=newLayer({name:'Fläche 1'}); nl.corners=defaultCorners(4/3,.6); nl.home=nl.corners.map(c=>c.slice()); S.layers=[nl]; }
   LAYER_ID=Math.max(LAYER_ID,...S.layers.map(l=>l.id))+1; MEDIA_ID=Math.max(MEDIA_ID,0,...S.media.map(m=>m.id))+1; FONT_ID=Math.max(FONT_ID,0,...S.fonts.map(f=>f.id))+1;
   S.sel=Math.min(Math.max(0,cleanNum(j.sel,0,1e6,0)|0),S.layers.length-1);
@@ -2145,13 +2210,14 @@ function applyState(j,getBlob){
       try{
         if(m.isDemo){ m.el=demoArt(); m.ver++; return; }
         if(m.kind==='text'){ renderText(m); return; }
+        if(m.kind==='color'){ renderColor(m); return; }
         if(m.kind==='camera') return;
         const b=await getBlob('m'+m.id);
         if(b) await mediaFromBlob(m,b); else m.missing=true;
       }catch(e){ m.missing=true; }
       renderMedia(); renderLayers();
     }));
-    fillFontSelect(); renderMedia(); refreshMediaUI(); renderLayers();
+    fillFontSelect(); renderMedia(); refreshMediaUI(); renderLayers(); renderScenes(); renderVj();
   })();
 }
 function dataURLtoBlob(s){
@@ -2173,7 +2239,8 @@ async function fromV3(metas,getImg){
 }
 function defaultState(){
   const demo=newMedia({kind:'image',name:'Beispielbild',isDemo:true}); demo.el=demoArt(); demo.ver++;
-  const l=newLayer({name:'Fläche 1',media:[demo.id],p:{...DEF,...PRESETS['Sanft lebendig']},look:'Sanft lebendig'});
+  // Standard: kein Effekt auf dem Material (alle Effekt-Regler auf 0) – Looks sind eine bewusste Wahl
+  const l=newLayer({name:'Fläche 1',media:[demo.id],p:{...DEF},look:null});
   l.corners=defaultCorners(900/1260,.8); l.home=l.corners.map(c=>c.slice());
   S.media=[demo]; S.layers=[l]; S.sel=0; S.msel=0; computeRect(l);
 }
@@ -2392,6 +2459,8 @@ function layoutStage(){
 const HINTS={
   map:'<span><kbd>Ziehen</kbd> Punkt / Fläche verschieben</span><span><kbd>Mausrad</kbd> skalieren · <kbd>Alt</kbd>+Rad drehen</span><span><kbd>Tab</kbd> Punkt wählen · <kbd>Pfeile</kbd> fein</span><span><kbd>I</kbd> Form · Bild · Biegen</span><span><kbd>P</kbd> Vorschau ohne Hilfslinien</span>',
   media:'<span><kbd>Klick</kbd> auf eine Fläche: gewählte Datei dort zeigen oder entfernen</span><span><kbd>P</kbd> Vorschau ohne Hilfslinien</span><span><kbd>Strg</kbd>+<kbd>V</kbd> Bild einfügen</span>',
+  scenes:'<span><kbd>1</kbd>–<kbd>9</kbd> Szene aufrufen (auch im Beamerfenster)</span><span><kbd>Klick</kbd> auf eine Szene ruft sie auf</span>',
+  vj:'<span>Pad gedrückt = Medium sichtbar</span><span>Sustain-Pedal hält Pads</span><span><kbd>Esc</kbd> bricht „Lernen“ ab</span>',
   crop:'<span><kbd>Ziehen</kbd> die 4 Ecken auf den gewünschten Ausschnitt – schräg fotografierte Bilder werden dabei entzerrt</span><span><kbd>Enter</kbd> oder „✓ Fertig“ schließt</span>',
 };
 function setTab(t){
@@ -2400,7 +2469,8 @@ function setTab(t){
   $('tabCrop').style.display=t==='crop'?'':'none'; $('bCropDone').style.display=t==='crop'?'':'none';
   if(Draw.active&&t!=='map') Draw.stop();
   tab=t; document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('act',el.dataset.tab===t));
-  ['map','media','crop'].forEach(k=>$('panel'+k[0].toUpperCase()+k.slice(1)).classList.toggle('show',k===t));
+  ['map','media','scenes','vj','crop'].forEach(k=>$('panel'+k[0].toUpperCase()+k.slice(1)).classList.toggle('show',k===t));
+  if(t==='media'){ renderMedia(); refreshMediaUI(); } else if(t==='scenes') renderScenes(); else if(t==='vj') renderVj();
   mapEd.enabled=t==='map'&&!Draw.active; cropEd.enabled=t==='crop'; ov.style.cursor='default';
   $('stHints').innerHTML=HINTS[t];
   if(t==='crop'){const m=M(); $('tabCrop').textContent='Zuschneiden: '+m.name;
@@ -2433,7 +2503,9 @@ function frame(){
   if(S.clean&&tab!=='crop'&&!Draw.active){ if(!S.cleanDrawn){ov.getContext('2d').clearRect(0,0,ov.width,ov.height);S.cleanDrawn=true;} }
   else if(tab==='map'){ S.cleanDrawn=false; mapEd.draw(); if(Draw.active) Draw.draw(); }
   else if(tab==='media'){ S.cleanDrawn=false; Assign.draw(); }
+  else if(tab==='scenes'||tab==='vj'){ if(!S.cleanDrawn){ ov.getContext('2d').clearRect(0,0,ov.width,ov.height); S.cleanDrawn=true; } }
   else { S.cleanDrawn=false; cropEd.draw(); }
+  if(VJ.dirty||VJ.ui||VJ.sel) vjTick();
   requestAnimationFrame(frame);
 }
 
@@ -2499,6 +2571,7 @@ setInterval(updateOutBtn,1500);
 
 /* ---------- Tastatur ---------- */
 function handleKey(e,fromOut,toggleFS,showHint){
+  if(e.key==='Escape'&&VJ.learn){ VJ.learn=null; renderVj(); e.preventDefault(); return; }
   const tag=(e.target&&e.target.tagName)||'';
   if(!fromOut&&(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA')&&e.key!=='Escape') return;
   if(!fromOut&&Draw.key(e)){e.preventDefault();return;}
@@ -2507,7 +2580,8 @@ function handleKey(e,fromOut,toggleFS,showHint){
   if(fromOut&&outEdit&&outEd.key(e)){e.preventDefault();return;}
   if(!fromOut&&(tab==='map'||tab==='crop')){const ed=tab==='map'?mapEd:cropEd; if(ed.key(e)){e.preventDefault(); if(tab==='map') surfaceChanged(L()); return;}}
   if(e.metaKey||e.ctrlKey) return;
-  if(k==='g'){toggleGrid();}
+  if(/^[1-9]$/.test(k)){ if(!recallSceneAt(+k-1)) return; }
+  else if(k==='g'){toggleGrid();}
   else if(k==='b'){toggleBlack();}
   else if(k===' '){togglePlay();e.preventDefault();}
   else if(k==='i'&&!S.locked){cycleEdit();}
@@ -2656,7 +2730,182 @@ async function downloadPy(){
 }
 
 
+/* ---------- Szenen: schneller Wechsel zwischen Mapping-Anordnungen ---------- */
+// Eine Szene = Kopie aller Flächen (Form, Lage, Biegung, Looks, Zuordnung) und der Medien-Einstellungen. Die Dateien selbst bleiben, wo sie sind.
+function sceneSnapshot(){ return {layers:JSON.parse(JSON.stringify(S.layers.map(surfMeta))), media:JSON.parse(JSON.stringify(S.media.map(mediaMeta))), sel:S.sel}; }
+function cleanScene(o){
+  if(!o||typeof o!=='object') return null; const id=cleanId(o.id); if(!id) return null;
+  const arr=a=>(Array.isArray(a)?a:[]).filter(x=>x&&typeof x==='object');
+  return {id,name:cleanStr(o.name,'Szene',60)||'Szene',layers:arr(o.layers).slice(0,300),media:arr(o.media).slice(0,500),sel:cleanNum(o.sel,0,1e6,0)|0};
+}
+function addScene(){
+  const sc={id:SCENE_ID++,name:'Szene '+(S.scenes.length+1),...sceneSnapshot()};
+  S.scenes.push(sc); S.scene=sc.id; saveLocal(); renderScenes(); renderVj();
+  toast('Szene gespeichert: „'+sc.name+'“'+(S.scenes.length<=9?' – Taste '+S.scenes.length+' ruft sie auf.':''));
+}
+function updateScene(id){ const sc=S.scenes.find(s=>s.id===id); if(!sc) return; Object.assign(sc,sceneSnapshot()); S.scene=id; saveLocal(); renderScenes(); toast('„'+sc.name+'“ mit dem aktuellen Stand überschrieben.'); }
+function deleteScene(id){
+  const sc=S.scenes.find(s=>s.id===id); if(!sc||!confirm('Szene „'+sc.name+'“ löschen?')) return;
+  S.scenes=S.scenes.filter(s=>s.id!==id); if(S.scene===id) S.scene=0;
+  delete VJ.binds['scene:'+id]; vjSave(); vjRebuild(); saveLocal(); renderScenes(); renderVj();
+}
+function recallScene(id){
+  const sc=S.scenes.find(s=>s.id===id); if(!sc) return false;
+  const have=new Set(S.media.map(m=>m.id)), layers=sc.layers.map(cleanSurface).filter(Boolean);
+  if(!layers.length){ toast('Diese Szene enthält keine Flächen.'); return false; }
+  layers.forEach(l=>{ l.media=l.media.filter(i=>have.has(i)); });
+  for(const mm of sc.media){
+    const live=S.media.find(m=>m.id===cleanId(mm.id)); if(!live||live.kind!==mm.kind) continue;
+    const c=cleanMedia(mm); if(!c) continue;
+    live.visible=c.visible; live.p=c.p; live.flipH=c.flipH; live.flipV=c.flipV; live.crop=c.crop; live.fit=c.fit;
+    if(live.kind==='text'){ live.text=c.text; renderText(live); }
+    if(live.kind==='color'&&live.color!==c.color){ live.color=c.color; renderColor(live); }
+    if(live.kind==='video') syncPlay(live);
+  }
+  if(tab==='crop') setTab('media');
+  S.layers=layers; LAYER_ID=Math.max(LAYER_ID,...layers.map(l=>l.id))+1;
+  layers.forEach(l=>{ computeRect(l); l.edgeVersion=++SCENE_EV; });
+  S.sel=Math.min(sc.sel,layers.length-1); S.scene=id;
+  mapEd.sel=-1; if(outEd) outEd.sel=-1;
+  refreshInputs(); markLook(); renderLayers(); renderMedia(); refreshMediaUI(); renderScenes(); updateInfo(); saveLocal();
+  toast('Szene: '+sc.name,1400); return true;
+}
+const recallSceneAt=i=>S.scenes[i]?recallScene(S.scenes[i].id):false;
+function renderScenes(){
+  const box=$('sceneList'); if(!box) return; box.innerHTML='';
+  if(!S.scenes.length){ box.innerHTML='<div class="hint">Noch keine Szenen. Mapping einrichten, dann oben „Aktuellen Stand speichern“.</div>'; return; }
+  S.scenes.forEach((sc,i)=>{
+    const row=document.createElement('div'); row.className='mrow'+(sc.id===S.scene?' act':''); row.style.cursor='pointer';
+    row.innerHTML='<span class="src"></span><span class="nm" title="Klick = aufrufen · Doppelklick = umbenennen"></span><button class="ib" data-a="upd" title="Mit dem aktuellen Stand überschreiben">⟳</button><button class="ib" data-a="del" title="Löschen">✕</button>';
+    row.querySelector('.src').textContent=i<9?String(i+1):'';
+    row.querySelector('.nm').textContent=sc.name+' · '+sc.layers.length+' Fläche'+(sc.layers.length===1?'':'n');
+    row.onclick=e=>{ const a=e.target.dataset&&e.target.dataset.a;
+      if(a==='upd') updateScene(sc.id); else if(a==='del') deleteScene(sc.id); else recallScene(sc.id); };
+    row.querySelector('.nm').ondblclick=e=>{ e.stopPropagation(); const n=prompt('Name der Szene:',sc.name); if(n){ sc.name=n.trim().slice(0,60)||sc.name; renderScenes(); renderVj(); saveLocal(); } };
+    box.appendChild(row);
+  });
+}
+
+/* ---------- VJ-Modus: MIDI-Pads, Regler, Sustain-Pedal ---------- */
+// Quelle (Note/CC + Kanal) ↔ Ziel. Ziele: vis:<Medium> (Pad gehalten), par:<Regler> (Drehregler), tog:<Schalter>, scene:<Szene>.
+const VJ={on:false,access:null,err:'',ins:[],binds:{},map:new Map(),gated:new Set(),learn:null,
+  down:new Set(),sust:new Set(),shown:new Set(),pedal:false,cur:0,srcOn:new Map(),last:'',dirty:false,ui:false};
+const VJ_KNOBS=[['opacity','Deckkraft'],['scale','Größe'],['rot','Drehung'],['zoom','Zoom'],['blur','Weichzeichnen']];
+const VJ_BTNS=[['tog:inv','Invertieren (an/aus)'],['tog:bw','Schwarzweiß (an/aus)'],['tog:black','Ausgabe schwarz (an/aus)']];
+const VJ_TGT=/^(par:(opacity|scale|rot|zoom|blur)|tog:(inv|bw|black)|vis:\d{1,9}|scene:\d{1,9})$/, VJ_SRC=/^[nc]:\d{1,2}:\d{1,3}$/;
+function vjLoad(){
+  try{ const j=JSON.parse(localStorage.getItem('artloop.midi')||'null');
+    if(j&&j.binds&&typeof j.binds==='object') for(const t in j.binds) if(VJ_TGT.test(t)&&VJ_SRC.test(String(j.binds[t]))) VJ.binds[t]=j.binds[t]; }catch(e){}
+  vjRebuild();
+}
+function vjSave(){ try{localStorage.setItem('artloop.midi',JSON.stringify({binds:VJ.binds}));}catch(e){} }
+function vjRebuild(){
+  VJ.map=new Map(); VJ.gated=new Set();
+  for(const t in VJ.binds){ const s=VJ.binds[t]; if(!VJ.map.has(s)) VJ.map.set(s,[]); VJ.map.get(s).push(t); if(t.startsWith('vis:')) VJ.gated.add(+t.slice(4)); }
+}
+// Medium sichtbar? Nur Medien mit Pad werden im VJ-Modus vom Pad gesteuert.
+function vjShow(m){ return !VJ.on||!VJ.gated.has(m.id)||VJ.shown.has(m.id); }
+function vjMedia(){ return S.media.find(m=>m.id===VJ.cur)||M(); }
+function vjCur(m){ VJ.cur=m.id; const i=S.media.indexOf(m); if(i>=0&&S.msel!==i){ S.msel=i; VJ.sel=true; } }
+async function vjConnect(){
+  if(VJ.access) return true;
+  if(!navigator.requestMIDIAccess){ VJ.err='Dieser Browser unterstützt kein MIDI – bitte Chrome oder Edge verwenden.'; return false; }
+  try{ VJ.access=await navigator.requestMIDIAccess({sysex:false}); VJ.access.onstatechange=vjAttach; vjAttach(); return true; }
+  catch(e){ VJ.err='MIDI-Zugriff nicht erlaubt ('+((e&&e.name)||'Fehler')+'). In den Browser-Einstellungen für diese Seite erlauben.'; return false; }
+}
+function vjAttach(){
+  VJ.ins=[]; for(const p of VJ.access.inputs.values()){ p.onmidimessage=vjMsg; if(p.state!=='disconnected') VJ.ins.push(p.name||'MIDI-Gerät'); }
+  VJ.err=''; renderVjStatus();
+}
+// Direkt im MIDI-Ereignis den Zustand setzen – gezeichnet wird im nächsten Bild (höchstens ein Frame Verzögerung)
+function vjMsg(e){
+  const d=e.data; if(!d||d.length<2) return; const type=d[0]&0xF0, ch=d[0]&15, n=d[1], v=d.length>2?d[2]:0;
+  if(type===0xB0){
+    if(n===64){ vjPedal(v>=64); return; }          // Sustain-Pedal
+    vjIn('c',ch,n,v,v>=64);
+  } else if(type===0x90||type===0x80) vjIn('n',ch,n,v,type===0x90&&v>0);
+}
+function vjPedal(dn){
+  VJ.pedal=dn; VJ.last='Sustain-Pedal '+(dn?'gedrückt':'losgelassen'); VJ.dirty=true;
+  if(!dn){ for(const id of VJ.sust) if(!VJ.down.has(id)) VJ.shown.delete(id); VJ.sust.clear(); }
+}
+function vjIn(t,ch,n,v,on){
+  const key=t+':'+ch+':'+n; VJ.last=(t==='n'?'Note ':'CC ')+n+' · Kanal '+(ch+1)+' · Wert '+v; VJ.dirty=true;
+  if(VJ.learn){ if(t==='n'&&!on) return; vjLearnDone(key); return; }
+  if(!VJ.on) return;
+  const was=VJ.srcOn.get(key)||false; VJ.srcOn.set(key,on);
+  const tg=VJ.map.get(key); if(!tg) return;
+  for(const id of tg) vjRun(id,v,on,on&&!was);
+}
+function vjRun(id,v,on,rise){
+  const i=id.indexOf(':'), k=id.slice(0,i), a=id.slice(i+1);
+  if(k==='par'){
+    const m=vjMedia(), r=MP.find(x=>x.k===a); if(!m||!r) return;
+    let x=r.min+(r.max-r.min)*v/127; x=Math.round(x/r.step)*r.step; m.p[a]=cleanNum(+x.toFixed(4),r.min,r.max,r.def); VJ.ui=true; saveLocal();
+  } else if(k==='vis'){
+    const mid=+a, m=S.media.find(x=>x.id===mid); if(!m) return;
+    if(on){ VJ.down.add(mid); VJ.shown.add(mid); vjCur(m); }
+    else { VJ.down.delete(mid); if(VJ.pedal) VJ.sust.add(mid); else VJ.shown.delete(mid); }
+  } else if(k==='tog'){
+    if(!rise) return;
+    if(a==='black') toggleBlack(); else { const m=vjMedia(); if(m){ m.p[a]=m.p[a]>=.5?0:1; VJ.ui=true; saveLocal(); } }
+  } else if(k==='scene'){ if(rise) recallScene(+a); }
+}
+function vjLearnDone(key){
+  const t=VJ.learn; VJ.learn=null;
+  for(const k in VJ.binds) if(VJ.binds[k]===key) delete VJ.binds[k];     // eine Taste, ein Ziel
+  VJ.binds[t]=key; vjSave(); vjRebuild(); renderVj(); toast('Zugeordnet: '+vjSrcLabel(key));
+}
+const vjSrcLabel=key=>{ if(!key) return 'nicht zugeordnet'; const [t,ch,n]=key.split(':'); return (t==='n'?'Note ':'CC ')+n+' · Kanal '+(+ch+1); };
+async function setVj(on){
+  VJ.on=on; VJ.shown.clear(); VJ.sust.clear(); VJ.down.clear(); VJ.srcOn.clear();
+  $('bVj').classList.toggle('on',on); $('bVj').textContent='🎛 VJ-Modus: '+(on?'an':'aus'); $('bVj2').textContent=on?'Ausschalten':'Einschalten';
+  renderVjStatus();
+  if(on){ const ok=await vjConnect(); renderVjStatus();
+    toast(!ok?VJ.err:VJ.ins.length?'VJ-Modus an: '+VJ.ins.join(', '):'VJ-Modus an – noch kein MIDI-Gerät gefunden. Gerät anschließen.',5000); }
+}
+function renderVjStatus(){
+  const el=$('vjStatus'); if(!el) return;
+  el.textContent=(VJ.on?'VJ-Modus ist an. ':'VJ-Modus ist aus – Pads und Regler wirken erst, wenn er an ist. ')+
+    (VJ.err||(VJ.access?(VJ.ins.length?'Verbunden: '+VJ.ins.join(', ')+'.':'Kein MIDI-Gerät gefunden.'):'Noch nicht mit MIDI verbunden (geschieht beim Einschalten oder beim ersten „Lernen“).'))+
+    (VJ.pedal?' Pedal gedrückt.':'');
+}
+function vjRow(box,tgt,label,extra){
+  const key=VJ.binds[tgt], row=document.createElement('div'); row.className='mrow'+(VJ.learn===tgt?' learn':''); row.dataset.t=tgt;
+  row.innerHTML='<span class="nm"></span><span class="src"></span>'+(extra?'<button class="btn sm" data-a="hold" title="Zum Testen gedrückt halten">▶</button>':'')+'<button class="btn sm" data-a="learn"></button><button class="ib" data-a="clear" title="Zuordnung löschen">✕</button>';
+  row.querySelector('.nm').textContent=label; row.querySelector('.nm').title=label;
+  const s=row.querySelector('.src'); s.textContent=VJ.learn===tgt?'jetzt am Gerät drücken/drehen …':vjSrcLabel(key); s.classList.toggle('on',!!key);
+  row.querySelector('[data-a=learn]').textContent=VJ.learn===tgt?'Abbrechen':'Lernen';
+  row.onclick=async e=>{ const a=e.target.dataset&&e.target.dataset.a;
+    if(a==='learn'){ if(VJ.learn===tgt){ VJ.learn=null; renderVj(); return; }
+      if(!(await vjConnect())){ toast(VJ.err,6000); renderVjStatus(); return; } VJ.learn=tgt; renderVj(); }
+    else if(a==='clear'){ delete VJ.binds[tgt]; vjSave(); vjRebuild(); renderVj(); } };
+  const h=row.querySelector('[data-a=hold]');
+  if(h){ const dn=()=>{ if(!VJ.on){toast('Erst den VJ-Modus einschalten.');return;} vjRun(tgt,127,true,true); }, up=()=>{ if(VJ.on) vjRun(tgt,0,false,false); };
+    h.addEventListener('pointerdown',dn); h.addEventListener('pointerup',up); h.addEventListener('pointerleave',up); }
+  box.appendChild(row);
+}
+function renderVj(){
+  const pads=$('vjPads'); if(!pads) return; renderVjStatus();
+  pads.innerHTML=''; $('vjKnobs').innerHTML=''; $('vjBtns').innerHTML=''; $('vjScenes').innerHTML='';
+  if(!S.media.length) pads.innerHTML='<div class="hint">Noch keine Medien.</div>';
+  S.media.forEach(m=>vjRow(pads,'vis:'+m.id,m.name+' ('+KIND[m.kind]+')',true));
+  VJ_KNOBS.forEach(([k,l])=>vjRow($('vjKnobs'),'par:'+k,l));
+  VJ_BTNS.forEach(([t,l])=>vjRow($('vjBtns'),t,l));
+  if(!S.scenes.length) $('vjScenes').innerHTML='<div class="hint">Noch keine Szenen (Tab „Szenen“).</div>';
+  S.scenes.forEach(sc=>vjRow($('vjScenes'),'scene:'+sc.id,sc.name));
+}
+// einmal je Bild: Anzeige nachziehen, nie im MIDI-Ereignis selbst
+function vjTick(){
+  VJ.dirty=false;
+  if(tab==='vj'){ const el=$('vjLast'); if(el) el.textContent='Letzte Nachricht: '+(VJ.last||'–');
+    document.querySelectorAll('#vjPads .mrow').forEach(r=>r.classList.toggle('live',VJ.on&&VJ.shown.has(+r.dataset.t.slice(4)))); renderVjStatus(); }
+  if(VJ.ui||VJ.sel){ const sel=VJ.sel; VJ.ui=VJ.sel=false;
+    if(tab==='media'){ if(sel){ renderMedia(); refreshMediaUI(); } else { const m=M(); if(m){ for(const k in MS) MS[k].set(m.p[k]); $('bMInv').classList.toggle('on',m.p.inv>=.5); $('bMBw').classList.toggle('on',m.p.bw>=.5); } } } }
+}
+
 /* ---------- Verdrahtung ---------- */
+vjLoad();
 loadTaste();
 defaultState();
 buildControls();
@@ -2665,6 +2914,8 @@ const ready=loadStart();
 const on=(id,f)=>{$(id).onclick=f;};
 $('file').addEventListener('change',e=>{importFiles([...(e.target.files||[])]);e.target.value='';});
 $('tFontFile').addEventListener('change',e=>{addFontFile(e.target.files&&e.target.files[0]);e.target.value='';});
+on('bVj',()=>setVj(!VJ.on)); on('bVj2',()=>setVj(!VJ.on)); on('bSceneAdd',addScene);
+on('bVjClear',()=>{ if(confirm('Alle MIDI-Zuordnungen löschen?')){ VJ.binds={}; vjSave(); vjRebuild(); renderVj(); } });
 on('bLock',toggleLock); on('bOut',openOutput); on('bPlay',togglePlay); on('bReset',resetAll);
 on('bGrid',toggleGrid); on('bClean',toggleClean); on('bBlack',toggleBlack);
 on('bEdges',()=>{S.edgesView=!S.edgesView;$('bEdges').classList.toggle('on',S.edgesView);});
@@ -2702,6 +2953,10 @@ on('bMPlay',withM(m=>{m.paused=!m.paused;syncPlay(m);refreshMediaUI();saveLocal(
 on('bMRestart',withM(m=>{if(m.el&&m.kind==='video'){m.el.currentTime=0;m.paused=false;syncPlay(m);refreshMediaUI();}}));
 on('bMMute',withM(m=>{m.muted=!m.muted;syncPlay(m);refreshMediaUI();saveLocal();}));
 on('bMReset',resetMedia);
+on('bAddColor',addColor);
+$('mColor').addEventListener('input',withM(m=>{if(m.kind==='color'){m.color=$('mColor').value;renderColor(m);saveLocal();}}));
+$('mColor').addEventListener('change',()=>addSwatch($('mColor').value));
+on('bMInv',withM(m=>toggleMedia(m,'inv'))); on('bMBw',withM(m=>toggleMedia(m,'bw')));
 on('bMFlipH',withM(m=>{m.flipH=!m.flipH;refreshMediaUI();saveLocal();}));
 on('bMFlipV',withM(m=>{m.flipV=!m.flipV;refreshMediaUI();saveLocal();}));
 const rot90=d=>withM(m=>{let r=m.p.rot+d;r=((r+180)%360+360)%360-180;m.p.rot=r;refreshMediaUI();saveLocal();});
