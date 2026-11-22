@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <!-- CSP: script-src enthaelt den sha256-Hash des Hauptskripts (das script-Element ohne Attribute). Nach jeder Aenderung daran neu berechnen, sonst startet die App nicht. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-DkXPMAnEQvVGwuZTXy8DHgnaUWcGBH5V+0pvn7NsXLQ='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src blob:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Tkm38WQzwMBmQOFi85DYwnutHXGWNf7+TRalcjjZhhA='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src blob:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ArtLoop Projection Studio</title>
 <meta name="description" content="Projection Mapping im Browser: Bilder, Videos, Kamera und Text auf Flächen, Kugeln und Würfel – mit Effekten, Loop-Export und Syphon.">
@@ -148,6 +148,8 @@ select.wide{flex:1;min-width:0}
 .box.fold>h4.hrow>:last-child{margin-left:auto}
 
 /* --- Schlanke Oberfläche --- */
+.chip.mth{display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 3px;max-width:100%}.chip.mth canvas{width:34px;height:34px;border-radius:4px;background:#000;flex:none}.chip.mth span{overflow:hidden;text-overflow:ellipsis}
+.addrow{flex-wrap:nowrap}.addrow .btn{flex:1;justify-content:center;padding:4px 3px}
 .stp{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--acc);color:#04222a;font:700 11px/1 system-ui,sans-serif;font-style:normal;flex:none}
 .tab .stp{margin-right:6px;background:#2a3140;color:var(--mute)}
 .tab.act .stp{background:var(--acc);color:#04222a}
@@ -179,9 +181,9 @@ body:not(.tips) aside .hint:not([id]):not(.keep){display:none}
 <body>
 <header>
   <div class="logo">Art<b>Loop</b></div>
-  <label class="btn pri" id="bLoad" for="file" title="Schritt 1: Bilder und Videos importieren"><i class="stp">1</i>Datei importieren</label>
+  <label class="btn pri" id="bLoad" for="file" title="Bilder und Videos importieren">Datei importieren</label>
   <input type="file" id="file" accept="image/*,video/*,.heic,.heif,.mov,.m4v,.mkv" multiple class="hiddenfile">
-  <button class="btn pri" id="bOut" title="Schritt 3: Ausgabe auf dem Beamer öffnen"><i class="stp">3</i><span class="outdot" id="outDot"></span><span>Beamer-Ausgabe öffnen</span></button>
+  <button class="btn pri" id="bOut" title="Ausgabe auf dem Beamer öffnen"><span class="outdot" id="outDot"></span><span>Beamer-Ausgabe öffnen</span></button>
   <button class="btn" id="bPlay">❚❚ Pause</button>
   <div class="sp"></div>
   <div class="menuwrap">
@@ -208,7 +210,7 @@ body:not(.tips) aside .hint:not([id]):not(.keep){display:none}
   <div id="stageCol">
     <div class="tabs">
       <div class="tab act" data-tab="map">Mapping</div>
-      <div class="tab" data-tab="media"><i class="stp">2</i>Medien</div>
+      <div class="tab" data-tab="media">Medien</div>
       <div class="tab" data-tab="scenes">Szenen</div>
       <div class="tab" data-tab="vj">VJ / MIDI</div>
       <div class="tab" data-tab="crop" id="tabCrop" style="display:none">Zuschneiden</div>
@@ -282,7 +284,8 @@ body:not(.tips) aside .hint:not([id]):not(.keep){display:none}
     </div>
     <div class="panel" id="panelMedia">
       <div class="box key">
-        <h4 class="hrow">Medien <span><label class="btn sm" for="file">+ Datei</label> <button class="btn sm" id="bAddCam">+ Kamera</button> <button class="btn sm" id="bAddText">+ Text</button> <button class="btn sm" id="bAddColor" title="Einfarbige Fläche mit frei wählbarer Farbe">+ Farbe</button></span></h4>
+        <h4>Medien</h4>
+        <div class="btnrow addrow"><label class="btn sm" for="file">+ Datei</label><button class="btn sm" id="bAddCam">+ Kamera</button><button class="btn sm" id="bAddText">+ Text</button><button class="btn sm" id="bAddColor" title="Einfarbige Fläche mit frei wählbarer Farbe">+ Farbe</button></div>
         <div id="mediaList"></div>
         <div class="hint" style="margin:4px 0 0">Datei wählen, dann im Bild links auf Flächen klicken: dort läuft sie. Nochmal klicken nimmt sie weg. Oben liegt vorne.</div>
       </div>
@@ -331,9 +334,9 @@ body:not(.tips) aside .hint:not([id]):not(.keep){display:none}
         <div class="hint" id="vjLast" style="margin-top:-4px"></div>
         <div class="hint">Zuordnen: bei einer Zeile auf „Lernen“ klicken, dann das Pad bzw. den Regler am Gerät bewegen – <b>oder eine Taste der Laptop-Tastatur drücken</b>. Zugeordnete Tasten haben im VJ-Modus Vorrang vor den normalen Kurzbefehlen. Die Zuordnung bleibt in diesem Browser gespeichert. Esc bricht ab. Regler und Tasten wirken auf das Medium, dessen Pad zuletzt gedrückt wurde (oder das im Tab „Medien“ gewählte).</div>
       </div>
-      <div class="box"><h4>Pads: Medium nur sichtbar, solange gedrückt</h4><div class="hint">Medien ohne Pad bleiben wie gewohnt sichtbar. Mit gehaltenem Sustain-Pedal bleiben losgelassene Pads an, bis das Pedal losgelassen wird.</div><div id="vjPads"></div></div>
+      <div class="box"><h4>Medien</h4><div class="hint">Medien ohne Pad bleiben wie gewohnt sichtbar. Mit gehaltenem Sustain-Pedal bleiben losgelassene Pads an, bis das Pedal losgelassen wird.</div><div id="vjPads"></div></div>
       <div class="box"><h4>Regler (für das aktuelle Medium)</h4><div class="hint">Nur für Fader/Drehregler am MIDI-Gerät. Sie wirken auf das hier gewählte Medium (wechselt auch mit dem zuletzt gedrückten Pad):</div><div class="chips" id="vjCur" style="margin-bottom:8px"></div><div id="vjKnobs"></div></div>
-      <div class="box"><h4>Tasten</h4><div id="vjBtns"></div></div>
+      <div class="box"><h4>Effekte</h4><div id="vjBtns"></div></div>
       <div class="box"><h4>Szenen aufrufen</h4><div id="vjScenes"></div></div>
       <div class="box"><button class="btn sm" id="bVjClear">Alle Zuordnungen löschen</button></div>
     </div>
@@ -2969,7 +2972,7 @@ function renderVjCur(){
   if(box.dataset.k===S.media.map(m=>m.id+m.name).join('|')+'#'+id) return;
   box.dataset.k=S.media.map(m=>m.id+m.name).join('|')+'#'+id; box.innerHTML='';
   if(!S.media.length){ box.innerHTML='<div class="hint">Noch keine Medien.</div>'; return; }
-  S.media.forEach(m=>{ const c=document.createElement('span'); c.className='chip'+(m.id===id?' act':''); c.textContent=m.name; c.title=m.name;
+  S.media.forEach(m=>{ const c=document.createElement('span'); c.className='chip mth'+(m.id===id?' act':''); c.title=m.name; const cv=document.createElement('canvas'); cv.width=cv.height=68; const t=document.createElement('span'); t.textContent=m.name; c.append(cv,t); drawThumb(cv,m);
     c.onclick=()=>{ vjCur(m); renderVjCur(); saveLocal(); }; box.appendChild(c); });
 }
 function renderVj(){
@@ -3020,7 +3023,7 @@ on('bLike',like); on('bDislike',dislike); on('bSuggest',()=>suggest(false)); on(
 on('bForget',()=>{if(confirm('Alle Bewertungen und „Meine Looks“ löschen?')){Taste.likes=[];Taste.dislikes=[];saveTaste();buildPresets();}});
 // Alle Bereiche starten eingeklappt; Klick auf die Überschrift klappt auf/zu
 document.querySelectorAll('aside .panel').forEach(pn=>{
-  const boxes=[...pn.querySelectorAll('.box')].filter(b=>b.firstElementChild&&b.firstElementChild.tagName==='H4');
+  const boxes=[...pn.querySelectorAll('.box')].filter(b=>b.firstElementChild&&b.firstElementChild.tagName==='H4'&&!b.querySelector('.addrow'));
   if(boxes.length<2) return; // einzelner Bereich im Tab bleibt offen
   boxes.forEach(b=>{
     b.classList.add('fold');
