@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <!-- CSP: script-src enthaelt den sha256-Hash des Hauptskripts (das script-Element ohne Attribute). Nach jeder Aenderung daran neu berechnen, sonst startet die App nicht. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-sQIEsUG9D6Th7dFzXJrpAKTsg11j8qozpfYIx3RSM40=' 'sha256-Tqnmo80xhXnwJWticHdOyTa1tk7xp7wsa0sbMwmntPg='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src blob:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-KwZwj5KGzf5MpGCVsPhIJn6YRNcTmX0YGd/okbqhUjM=' 'sha256-Tqnmo80xhXnwJWticHdOyTa1tk7xp7wsa0sbMwmntPg='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src blob:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ArtLoop Projection Studio</title>
 <meta name="description" content="Projection Mapping im Browser: Bilder, Videos, Kamera und Text auf Flächen, Kugeln und Würfel – mit Effekten, Loop-Export und Syphon.">
@@ -277,10 +277,11 @@ select.wide{flex:1;min-width:0}
         <h4 class="hrow">VJ-Modus <button class="btn sm" id="bVj2">Einschalten</button></h4>
         <div class="hint" id="vjStatus"></div>
         <div class="hint" id="vjLast" style="margin-top:-4px"></div>
-        <div class="hint">Zuordnen: bei einer Zeile auf „Lernen“ klicken, dann das Pad bzw. den Regler am Gerät bewegen. Die Zuordnung bleibt in diesem Browser gespeichert. Esc bricht ab. Regler und Tasten wirken auf das Medium, dessen Pad zuletzt gedrückt wurde (oder das im Tab „Medien“ gewählte).</div>
+        <div class="hint">Zuordnen: bei einer Zeile auf „Lernen“ klicken, dann das Pad bzw. den Regler am Gerät bewegen – <b>oder eine Taste der Laptop-Tastatur drücken</b>. Zugeordnete Tasten haben im VJ-Modus Vorrang vor den normalen Kurzbefehlen. Die Zuordnung bleibt in diesem Browser gespeichert. Esc bricht ab. Regler und Tasten wirken auf das Medium, dessen Pad zuletzt gedrückt wurde (oder das im Tab „Medien“ gewählte).</div>
       </div>
       <div class="box"><h4>Pads: Medium nur sichtbar, solange gedrückt</h4><div class="hint">Medien ohne Pad bleiben wie gewohnt sichtbar. Mit gehaltenem Sustain-Pedal bleiben losgelassene Pads an, bis das Pedal losgelassen wird.</div><div id="vjPads"></div></div>
       <div class="box"><h4>Regler (für das aktuelle Medium)</h4><div id="vjKnobs"></div></div>
+      <div class="box"><h4>Regler per Tastatur</h4><div class="hint">Taste halten = Wert steigt bzw. sinkt stetig.</div><div id="vjKeys"></div></div>
       <div class="box"><h4>Tasten</h4><div id="vjBtns"></div></div>
       <div class="box"><h4>Szenen aufrufen</h4><div id="vjScenes"></div></div>
       <div class="box"><button class="btn sm" id="bVjClear">Alle Zuordnungen löschen</button></div>
@@ -2544,7 +2545,7 @@ body.nocur,body.nocur *{cursor:none!important}
   showHint(6000);
   const toggleFS=()=>{if(d.fullscreenElement) d.exitFullscreen(); else d.documentElement.requestFullscreen().catch(()=>{});};
   W.addEventListener('dblclick',e=>{if(!outEdit) toggleFS();});
-  W.addEventListener('keydown',e=>handleKey(e,true,toggleFS,showHint));
+  W.addEventListener('keydown',e=>handleKey(e,true,toggleFS,showHint)); W.addEventListener('keyup',vjKeyUp); W.addEventListener('blur',vjKeysRelease);
   let curT; W.addEventListener('mousemove',()=>{d.body.classList.remove('nocur');clearTimeout(curT);curT=setTimeout(()=>{if(!outEdit)d.body.classList.add('nocur');},2000);});
   W.addEventListener('beforeunload',()=>{outR=null;outEd=null;setTimeout(updateOutBtn,100);});
   const loop=()=>{
@@ -2574,6 +2575,7 @@ function handleKey(e,fromOut,toggleFS,showHint){
   if(e.key==='Escape'&&VJ.learn){ VJ.learn=null; renderVj(); e.preventDefault(); return; }
   const tag=(e.target&&e.target.tagName)||'';
   if(!fromOut&&(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA')&&e.key!=='Escape') return;
+  if(vjKeyDown(e)){e.preventDefault();return;}
   if(!fromOut&&Draw.key(e)){e.preventDefault();return;}
   if(!fromOut&&tab==='crop'&&e.key==='Enter'){setTab('media');e.preventDefault();return;}
   const k=e.key.toLowerCase();
@@ -2593,6 +2595,7 @@ function handleKey(e,fromOut,toggleFS,showHint){
   e.preventDefault();
 }
 document.addEventListener('keydown',e=>handleKey(e,false));
+document.addEventListener('keyup',vjKeyUp); window.addEventListener('blur',vjKeysRelease);
 
 function toggleGrid(){S.grid=!S.grid;$('bGrid').classList.toggle('on',S.grid);}
 // Saubere Vorschau: Punkte, Linien und Beschriftungen ausblenden – Bearbeiten (Ziehen, Pfeile, Rad) geht weiter
@@ -2791,8 +2794,8 @@ function renderScenes(){
 const VJ={on:false,access:null,err:'',ins:[],binds:{},map:new Map(),gated:new Set(),learn:null,
   down:new Set(),sust:new Set(),shown:new Set(),pedal:false,cur:0,srcOn:new Map(),last:'',dirty:false,ui:false};
 const VJ_KNOBS=[['opacity','Deckkraft'],['scale','Größe'],['rot','Drehung'],['zoom','Zoom'],['blur','Weichzeichnen']];
-const VJ_BTNS=[['tog:inv','Invertieren (an/aus)'],['tog:bw','Schwarzweiß (an/aus)'],['tog:black','Ausgabe schwarz (an/aus)']];
-const VJ_TGT=/^(par:(opacity|scale|rot|zoom|blur)|tog:(inv|bw|black)|vis:\d{1,9}|scene:\d{1,9})$/, VJ_SRC=/^[nc]:\d{1,2}:\d{1,3}$/;
+const VJ_BTNS=[['tog:inv','Invertieren (an/aus)'],['tog:bw','Schwarzweiß (an/aus)'],['tog:black','Ausgabe schwarz (an/aus)'],['pedal','Sustain halten (Taste halten)']];
+const VJ_TGT=/^((par|pup|pdn):(opacity|scale|rot|zoom|blur)|tog:(inv|bw|black)|pedal|vis:\d{1,9}|scene:\d{1,9})$/, VJ_SRC=/^([nc]:\d{1,2}:\d{1,3}|k:[A-Za-z0-9]{1,20})$/;
 function vjLoad(){
   try{ const j=JSON.parse(localStorage.getItem('artloop.midi')||'null');
     if(j&&j.binds&&typeof j.binds==='object') for(const t in j.binds) if(VJ_TGT.test(t)&&VJ_SRC.test(String(j.binds[t]))) VJ.binds[t]=j.binds[t]; }catch(e){}
@@ -2829,19 +2832,35 @@ function vjPedal(dn){
   VJ.pedal=dn; VJ.last='Sustain-Pedal '+(dn?'gedrückt':'losgelassen'); VJ.dirty=true;
   if(!dn){ for(const id of VJ.sust) if(!VJ.down.has(id)) VJ.shown.delete(id); VJ.sust.clear(); }
 }
-function vjIn(t,ch,n,v,on){
-  const key=t+':'+ch+':'+n; VJ.last=(t==='n'?'Note ':'CC ')+n+' · Kanal '+(ch+1)+' · Wert '+v; VJ.dirty=true;
-  if(VJ.learn){ if(t==='n'&&!on) return; vjLearnDone(key); return; }
+function vjIn(t,ch,n,v,on){ vjDispatch(t+':'+ch+':'+n,v,on); }
+// Gemeinsamer Weg für MIDI und Laptop-Tastatur
+function vjDispatch(key,v,on){
+  VJ.last=vjSrcLabel(key)+(key[0]==='k'?(on?' gedrückt':' losgelassen'):' · Wert '+v); VJ.dirty=true;
+  if(VJ.learn){ if(!on&&key[0]!=='c') return; vjLearnDone(key); return; }
   if(!VJ.on) return;
   const was=VJ.srcOn.get(key)||false; VJ.srcOn.set(key,on);
   const tg=VJ.map.get(key); if(!tg) return;
   for(const id of tg) vjRun(id,v,on,on&&!was);
 }
+// Laptop-Tastatur: physische Taste (e.code), unabhängig vom Tastaturlayout
+function vjKeyDown(e){
+  if(e.metaKey||e.ctrlKey||e.altKey||e.isComposing||/^(Shift|Control|Alt|Meta|CapsLock)/.test(e.code)||e.code==='Escape'||e.code==='Tab') return false;
+  const key='k:'+e.code;
+  if(VJ.learn){ if(e.repeat) return true; vjDispatch(key,127,true); return true; }
+  if(!VJ.on||!VJ.map.has(key)) return false;
+  vjDispatch(key,127,true); return true;
+}
+function vjKeyUp(e){ const key='k:'+e.code; if(VJ.on&&VJ.srcOn.get(key)) vjDispatch(key,0,false); }
+function vjKeysRelease(){ if(!VJ.on) return; for(const [k,on] of [...VJ.srcOn]) if(on&&k[0]==='k') vjDispatch(k,0,false); }
 function vjRun(id,v,on,rise){
-  const i=id.indexOf(':'), k=id.slice(0,i), a=id.slice(i+1);
+  const i=id.indexOf(':'), k=i<0?id:id.slice(0,i), a=i<0?'':id.slice(i+1);
   if(k==='par'){
     const m=vjMedia(), r=MP.find(x=>x.k===a); if(!m||!r) return;
     let x=r.min+(r.max-r.min)*v/127; x=Math.round(x/r.step)*r.step; m.p[a]=cleanNum(+x.toFixed(4),r.min,r.max,r.def); VJ.ui=true; saveLocal();
+  } else if(k==='pup'||k==='pdn'){
+    if(!on) return; const m=vjMedia(), r=MP.find(x=>x.k===a); if(!m||!r) return;
+    m.p[a]=cleanNum(+(m.p[a]+(k==='pup'?1:-1)*(r.max-r.min)*.03).toFixed(4),r.min,r.max,r.def); VJ.ui=true; saveLocal();
+  } else if(k==='pedal'){ if(on!==VJ.pedal) vjPedal(on);
   } else if(k==='vis'){
     const mid=+a, m=S.media.find(x=>x.id===mid); if(!m) return;
     if(on){ VJ.down.add(mid); VJ.shown.add(mid); vjCur(m); }
@@ -2856,13 +2875,14 @@ function vjLearnDone(key){
   for(const k in VJ.binds) if(VJ.binds[k]===key) delete VJ.binds[k];     // eine Taste, ein Ziel
   VJ.binds[t]=key; vjSave(); vjRebuild(); renderVj(); toast('Zugeordnet: '+vjSrcLabel(key));
 }
-const vjSrcLabel=key=>{ if(!key) return 'nicht zugeordnet'; const [t,ch,n]=key.split(':'); return (t==='n'?'Note ':'CC ')+n+' · Kanal '+(+ch+1); };
+const vjSrcLabel=key=>{ if(!key) return 'nicht zugeordnet'; const [t,ch,n]=key.split(':');
+  if(t==='k') return 'Taste '+ch.replace(/^(Key|Digit|Numpad)/,'').replace('Arrow','Pfeil ').replace('Space','Leertaste'); return (t==='n'?'Note ':'CC ')+n+' · Kanal '+(+ch+1); };
 async function setVj(on){
   VJ.on=on; VJ.shown.clear(); VJ.sust.clear(); VJ.down.clear(); VJ.srcOn.clear();
   $('bVj').classList.toggle('on',on); $('bVj').textContent='🎛 VJ-Modus: '+(on?'an':'aus'); $('bVj2').textContent=on?'Ausschalten':'Einschalten';
   renderVjStatus();
   if(on){ const ok=await vjConnect(); renderVjStatus();
-    toast(!ok?VJ.err:VJ.ins.length?'VJ-Modus an: '+VJ.ins.join(', '):'VJ-Modus an – noch kein MIDI-Gerät gefunden. Gerät anschließen.',5000); }
+    toast(!ok?'VJ-Modus an (Tastatur). MIDI: '+VJ.err:VJ.ins.length?'VJ-Modus an: '+VJ.ins.join(', ')+' + Tastatur':'VJ-Modus an – kein MIDI-Gerät gefunden, Tastatur geht.',5000); }
 }
 function renderVjStatus(){
   const el=$('vjStatus'); if(!el) return;
@@ -2878,7 +2898,9 @@ function vjRow(box,tgt,label,extra){
   row.querySelector('[data-a=learn]').textContent=VJ.learn===tgt?'Abbrechen':'Lernen';
   row.onclick=async e=>{ const a=e.target.dataset&&e.target.dataset.a;
     if(a==='learn'){ if(VJ.learn===tgt){ VJ.learn=null; renderVj(); return; }
-      if(!(await vjConnect())){ toast(VJ.err,6000); renderVjStatus(); return; } VJ.learn=tgt; renderVj(); }
+      e.target.blur();
+      if(!(await vjConnect())) toast('Kein MIDI ('+VJ.err+') – Zuordnen per Laptop-Taste geht trotzdem.',6000);
+      VJ.learn=tgt; renderVj(); }
     else if(a==='clear'){ delete VJ.binds[tgt]; vjSave(); vjRebuild(); renderVj(); } };
   const h=row.querySelector('[data-a=hold]');
   if(h){ const dn=()=>{ if(!VJ.on){toast('Erst den VJ-Modus einschalten.');return;} vjRun(tgt,127,true,true); }, up=()=>{ if(VJ.on) vjRun(tgt,0,false,false); };
@@ -2887,10 +2909,11 @@ function vjRow(box,tgt,label,extra){
 }
 function renderVj(){
   const pads=$('vjPads'); if(!pads) return; renderVjStatus();
-  pads.innerHTML=''; $('vjKnobs').innerHTML=''; $('vjBtns').innerHTML=''; $('vjScenes').innerHTML='';
+  pads.innerHTML=''; $('vjKeys').innerHTML=''; $('vjKnobs').innerHTML=''; $('vjBtns').innerHTML=''; $('vjScenes').innerHTML='';
   if(!S.media.length) pads.innerHTML='<div class="hint">Noch keine Medien.</div>';
   S.media.forEach(m=>vjRow(pads,'vis:'+m.id,m.name+' ('+KIND[m.kind]+')',true));
   VJ_KNOBS.forEach(([k,l])=>vjRow($('vjKnobs'),'par:'+k,l));
+  VJ_KNOBS.forEach(([k,l])=>{ vjRow($('vjKeys'),'pup:'+k,l+' ＋'); vjRow($('vjKeys'),'pdn:'+k,l+' －'); });
   VJ_BTNS.forEach(([t,l])=>vjRow($('vjBtns'),t,l));
   if(!S.scenes.length) $('vjScenes').innerHTML='<div class="hint">Noch keine Szenen (Tab „Szenen“).</div>';
   S.scenes.forEach(sc=>vjRow($('vjScenes'),'scene:'+sc.id,sc.name));
