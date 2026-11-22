@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <!-- CSP: script-src enthaelt den sha256-Hash des Hauptskripts (das script-Element ohne Attribute). Nach jeder Aenderung daran neu berechnen, sonst startet die App nicht. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-wDeb+S/Rj7bR8Y8u3eikzkTXMeUU0BKtGVYhMTstTQY=' 'sha256-Tqnmo80xhXnwJWticHdOyTa1tk7xp7wsa0sbMwmntPg='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src blob:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-BfWXYOeoz9YfvSmf6RSGpZlKmhJYNmWyB/pThSoqzWw=' 'sha256-Tqnmo80xhXnwJWticHdOyTa1tk7xp7wsa0sbMwmntPg='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src blob:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ArtLoop Projection Studio</title>
 <meta name="description" content="Projection Mapping im Browser: Bilder, Videos, Kamera und Text auf Flächen, Kugeln und Würfel – mit Effekten, Loop-Export und Syphon.">
@@ -1802,20 +1802,80 @@ function releaseMedia(m){
   if(m.url){ URL.revokeObjectURL(m.url); m.url=null; }
 }
 function demoArt(){
-  const c=document.createElement('canvas');c.width=900;c.height=1260;const g=c.getContext('2d');
-  g.fillStyle='#ebe5d8';g.fillRect(0,0,c.width,c.height);
-  let seed=11;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
-  const pal=['#e63946','#f4a261','#2a9d8f','#264653','#e9c46a','#8d5cf6','#00b4d8','#ff70a6'];
-  g.lineJoin='round';g.lineCap='round';
-  for(let i=0;i<30;i++){
-    const cx=120+rnd()*660,cy=120+rnd()*1020,r=50+rnd()*150,n=4+Math.floor(rnd()*5),rot=rnd()*6;
-    g.beginPath();for(let k=0;k<n;k++){const a=rot+k/n*Math.PI*2,rr=r*(.6+rnd()*.6);g.lineTo(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr);}g.closePath();
-    g.fillStyle=pal[i%pal.length];g.fill();g.lineWidth=11;g.strokeStyle='#121212';g.stroke();
-    g.lineWidth=5;g.beginPath();g.moveTo(cx-r*.45,cy+r*.1);g.quadraticCurveTo(cx,cy-r*.5,cx+r*.45,cy+r*.1);g.stroke();
-    g.beginPath();g.arc(cx+r*.15,cy-r*.05,r*.12,0,7);g.fillStyle='#fff';g.fill();g.stroke();
+  // Beispielbild: Bergsee im Abendlicht (komplett im Browser gezeichnet, deterministisch)
+  const W=900,H=1260,HZ=740,c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');
+  let seed=7;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+  const lerp=(a,b,t)=>a+(b-a)*t, cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+  const mix=(a,b,t)=>a.map((v,i)=>Math.round(lerp(v,b[i],t))), rgb=(a,al=1)=>`rgba(${a[0]},${a[1]},${a[2]},${al})`;
+  const noise1=n=>{const p=[];for(let i=0;i<=n;i++)p.push(rnd());return x=>{const t=cl(x)*n,i=Math.min(n-1,Math.floor(t)),f=t-i,s=f*f*(3-2*f);return lerp(p[i],p[i+1],s);};};
+  const fbm=o=>{const ns=o.map(([n,a])=>[noise1(n),a]);return x=>ns.reduce((s,[f,a])=>s+f(x)*a,0);};
+  // Himmel
+  const sg=g.createLinearGradient(0,0,0,HZ);
+  sg.addColorStop(0,'#141c36');sg.addColorStop(.3,'#35457a');sg.addColorStop(.58,'#b86a82');sg.addColorStop(.8,'#ff9b5e');sg.addColorStop(1,'#ffd7a0');
+  g.fillStyle=sg;g.fillRect(0,0,W,HZ+2);
+  for(let i=0;i<110;i++){const y=rnd()*300;g.fillStyle=`rgba(255,255,255,${(1-y/300)*.75*rnd()})`;g.fillRect(rnd()*W,y,1.5,1.5);}
+  // Sonne
+  const SX=610,SY=HZ-34;
+  [[560,'255,170,110',.5],[190,'255,215,160',.85],[44,'255,250,235',1]].forEach(([r,col,a])=>{
+    const rg=g.createRadialGradient(SX,SY,0,SX,SY,r);rg.addColorStop(0,`rgba(${col},${a})`);rg.addColorStop(1,`rgba(${col},0)`);g.fillStyle=rg;g.fillRect(0,0,W,HZ+2);});
+  // Wolken: weiche, gestreckte Schwaden, nahe am Horizont warm, oben kühl
+  for(let b=0;b<16;b++){
+    const cy=110+rnd()*520,cx=rnd()*W,w=260+rnd()*380,h=26+rnd()*40,t=cl((cy-100)/560);
+    const col=mix([86,92,138],[255,150,100],t);
+    for(let k=0;k<30;k++){
+      const x=cx+(rnd()-.5)*w,y=cy+(rnd()-.5)*h,r=(.35+rnd()*.7)*h;
+      g.save();g.translate(x,y);g.scale(3.2,1);
+      const gr=g.createRadialGradient(0,0,0,0,0,r);gr.addColorStop(0,rgb(col,.16));gr.addColorStop(1,rgb(col,0));
+      g.fillStyle=gr;g.beginPath();g.arc(0,0,r,0,7);g.fill();
+      g.translate(0,r*.35);const lg=g.createRadialGradient(0,0,0,0,0,r*.8);lg.addColorStop(0,'rgba(255,205,150,.09)');lg.addColorStop(1,'rgba(255,205,150,0)');
+      g.fillStyle=lg;g.beginPath();g.arc(0,0,r*.8,0,7);g.fill();g.restore();
+    }
   }
-  g.font='bold 120px system-ui';g.textAlign='center';g.lineWidth=14;g.strokeStyle='#111';g.fillStyle='#fff';
-  g.strokeText('ART',450,1180);g.fillText('ART',450,1180);
+  // Berge mit Dunst-Tiefe
+  const haze=[255,185,140];
+  [[HZ-100,200,[150,126,160],.5,1],[HZ-50,160,[104,88,124],.45,1],[HZ-6,125,[58,52,80],.38,0],[HZ+22,92,[28,31,46],.25,0]].forEach(([base,amp,col,hz,rim],li)=>{
+    const f=fbm([[5+li,.62],[14+li*2,.28],[44,.12]]);
+    g.beginPath();g.moveTo(0,HZ+4);
+    for(let x=0;x<=W;x+=3)g.lineTo(x,base-amp*(f(x/W)-.2)*1.25*(.85+.3*Math.sin(x/W*3+li)));
+    g.lineTo(W,HZ+4);g.closePath();
+    const mg=g.createLinearGradient(0,base-amp,0,HZ);mg.addColorStop(0,rgb(col));mg.addColorStop(1,rgb(mix(col,haze,hz+.25)));
+    g.fillStyle=mg;g.fill();
+    if(rim){g.strokeStyle='rgba(255,196,150,.38)';g.lineWidth=1.4;g.beginPath();
+      for(let x=0;x<=W;x+=3){const y=base-amp*(f(x/W)-.2)*1.25*(.85+.3*Math.sin(x/W*3+li));x?g.lineTo(x,y):g.moveTo(x,y);}g.stroke();}
+  });
+  const hg=g.createLinearGradient(0,HZ-120,0,HZ+10);hg.addColorStop(0,'rgba(255,190,140,0)');hg.addColorStop(1,'rgba(255,200,150,.28)');g.fillStyle=hg;g.fillRect(0,HZ-120,W,130);
+  // See: gespiegelter Himmel mit Wellen
+  const off=document.createElement('canvas');off.width=W;off.height=HZ;off.getContext('2d').drawImage(c,0,0);
+  g.fillStyle='#1d2a44';g.fillRect(0,HZ,W,H-HZ);
+  for(let d=0;d<H-HZ;d+=2){
+    const dx=Math.sin(d*.085+1)*(1.2+d*.016)+Math.sin(d*.31)*(.6+d*.006), sy=Math.max(0,HZ-1-d*.9);
+    g.drawImage(off,0,sy,W,2,dx,HZ+d,W,2);
+  }
+  const wg=g.createLinearGradient(0,HZ,0,H);wg.addColorStop(0,'rgba(20,30,58,.18)');wg.addColorStop(1,'rgba(8,14,30,.78)');g.fillStyle=wg;g.fillRect(0,HZ,W,H-HZ);
+  for(let i=0;i<420;i++){const y=HZ+4+Math.pow(rnd(),1.4)*(H-HZ-4),w=10+rnd()*90*(.4+(y-HZ)/500);g.fillStyle=`rgba(${rnd()<.5?'255,205,160':'140,160,210'},${.05+rnd()*.1})`;g.fillRect(rnd()*W,y,w,1.2);}
+  for(let i=0;i<230;i++){const y=HZ+3+Math.pow(rnd(),1.2)*430,s=(y-HZ)/430,w=(8+rnd()*64)*(.4+s);g.fillStyle=`rgba(255,${200+Math.round(rnd()*40)},150,${.18+rnd()*.34})`;g.fillRect(SX+(rnd()-.5)*(30+s*130)-w/2,y,w,1.6);}
+  const sh=g.createLinearGradient(0,HZ-8,0,HZ+34);sh.addColorStop(0,'rgba(255,190,140,0)');sh.addColorStop(.3,'rgba(255,190,140,.3)');sh.addColorStop(1,'rgba(255,190,140,0)');g.fillStyle=sh;g.fillRect(0,HZ-8,W,42);
+  // Vordergrund: Kiefern & Ufer
+  function pine(x,base,h,col){
+    g.fillStyle=col;g.fillRect(x-h*.018,base-h*.12,h*.036,h*.14);
+    for(let t=0;t<7;t++){const y0=base-h*.1-t*h*.125,w=h*.2*(1-t/8.2)+h*.03,th=h*.2;
+      g.beginPath();g.moveTo(x,y0-th);g.lineTo(x+w*.6,y0-th*.4);g.lineTo(x+w*.32,y0-th*.4);g.lineTo(x+w,y0);
+      g.lineTo(x-w,y0);g.lineTo(x-w*.32,y0-th*.4);g.lineTo(x-w*.6,y0-th*.4);g.closePath();g.fill();}
+  }
+  const dark=[8,12,18];
+  g.fillStyle=rgb(dark);
+  g.beginPath();g.moveTo(0,H);g.lineTo(0,H-170);
+  for(let x=0;x<=W;x+=12)g.lineTo(x,H-90-Math.sin(x*.011)*14-rnd()*10-(x>420&&x<720?60:Math.max(0,150-x*.4)));
+  g.lineTo(W,H-70);g.lineTo(W,H);g.closePath();g.fill();
+  [[60,H-120,520],[150,H-95,380],[250,H-70,250],[800,H-85,430],[870,H-60,300],[720,H-60,200]].forEach(([x,b,h])=>pine(x,b,h,rgb(dark)));
+  // Vögel
+  g.strokeStyle='rgba(20,18,30,.75)';g.lineWidth=1.6;g.lineCap='round';
+  [[300,430,9],[336,402,7],[270,380,6],[372,452,8],[322,350,5]].forEach(([x,y,s])=>{g.beginPath();g.moveTo(x-s,y);g.quadraticCurveTo(x-s/2,y-s*.7,x,y);g.quadraticCurveTo(x+s/2,y-s*.7,x+s,y);g.stroke();});
+  // Vignette + Filmkorn
+  const vg=g.createRadialGradient(W/2,H*.52,H*.3,W/2,H*.52,H*.78);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.45)');g.fillStyle=vg;g.fillRect(0,0,W,H);
+  const id=g.getImageData(0,0,W,H),d=id.data;
+  for(let i=0;i<d.length;i+=4){const n=(rnd()-.5)*14;d[i]+=n;d[i+1]+=n;d[i+2]+=n;}
+  g.putImageData(id,0,0);
   return c;
 }
 function renderText(m){
