@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <!-- CSP: script-src enthaelt den sha256-Hash des Hauptskripts (das script-Element ohne Attribute). Nach jeder Aenderung daran neu berechnen, sonst startet die App nicht. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-KwZwj5KGzf5MpGCVsPhIJn6YRNcTmX0YGd/okbqhUjM=' 'sha256-Tqnmo80xhXnwJWticHdOyTa1tk7xp7wsa0sbMwmntPg='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src blob:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-DkXPMAnEQvVGwuZTXy8DHgnaUWcGBH5V+0pvn7NsXLQ='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src blob:; connect-src 'self' ws://127.0.0.1:* ws://localhost:*; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ArtLoop Projection Studio</title>
 <meta name="description" content="Projection Mapping im Browser: Bilder, Videos, Kamera und Text auf Flächen, Kugeln und Würfel – mit Effekten, Loop-Export und Syphon.">
@@ -139,42 +139,94 @@ select.wide{flex:1;min-width:0}
 .mrow .ib:hover{color:var(--text)}
 .mrow.live{border-color:var(--ok);background:#16301f}
 #bVj.on{border-color:var(--ok);color:var(--ok)}
+.btn.ico{font-size:16px;padding:3px 9px;line-height:1.3}
+.box.fold>h4{cursor:pointer;margin:0}
+.box.fold.open>h4{margin:0 0 8px}
+.box.fold:not(.open)>:not(h4){display:none}
+.box.fold>h4 .chev{display:inline-block;width:14px;color:var(--mute);font-size:11px}
+.box.fold>h4.hrow{flex-wrap:nowrap;justify-content:flex-start}
+.box.fold>h4.hrow>:last-child{margin-left:auto}
+
+/* --- Schlanke Oberfläche --- */
+.stp{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--acc);color:#04222a;font:700 11px/1 system-ui,sans-serif;font-style:normal;flex:none}
+.tab .stp{margin-right:6px;background:#2a3140;color:var(--mute)}
+.tab.act .stp{background:var(--acc);color:#04222a}
+header>.btn:not(.pri):not(.ico){background:transparent}
+.btn.pri{box-shadow:0 0 0 1px rgba(63,240,255,.25)}
+.menuwrap{position:relative}
+.menu{display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:30;min-width:210px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:0 10px 30px rgba(0,0,0,.5);flex-direction:column;gap:4px}
+.menu.show{display:flex}
+.menu .btn{justify-content:flex-start;width:100%;background:transparent;border-color:transparent}
+.menu .btn:hover{background:var(--panel2);border-color:var(--line)}
+.mlabel{display:flex;flex-direction:column;gap:4px;color:var(--mute);font-size:11px;padding:6px 8px}
+.box.key>h4{border-left:3px solid var(--acc);padding-left:8px}
+.box.fold:not(.key)>h4{color:#c9cdd6;font-weight:500}
+body:not(.tips) aside .hint:not([id]):not(.keep){display:none}
+.box.fold:not(.open){padding-top:9px;padding-bottom:9px}
+.box.fold:not(.open)>h4:not(:first-child){display:none}
+#tourDim{position:fixed;inset:0;z-index:70;display:none}
+#tourDim.show{display:block}
+#tourHole{position:fixed;border-radius:10px;box-shadow:0 0 0 9999px rgba(4,6,10,.72),0 0 0 2px var(--acc);pointer-events:none;transition:all .25s}
+#tourPop{position:fixed;z-index:71;width:min(330px,90vw);background:var(--panel);border:1px solid var(--acc);border-radius:12px;padding:16px;box-shadow:0 14px 40px rgba(0,0,0,.6);user-select:text;-webkit-user-select:text}
+#tourPop h3{margin:0 0 6px;font-size:15px}
+#tourPop p{margin:0 0 12px;color:#c9cdd6;line-height:1.5}
+#tourPop .tnav{display:flex;align-items:center;gap:6px}
+#tourPop .tcount{color:var(--mute);font-size:11px;margin-right:auto}
+#tourAsk{position:fixed;inset:0;z-index:72;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center}
+#tourAsk.show{display:flex}
 </style>
 </head>
 <body>
 <header>
   <div class="logo">Art<b>Loop</b></div>
-  <label class="btn" id="bLoad" for="file" title="Bilder und Videos importieren">Datei importieren</label>
+  <label class="btn pri" id="bLoad" for="file" title="Schritt 1: Bilder und Videos importieren"><i class="stp">1</i>Datei importieren</label>
   <input type="file" id="file" accept="image/*,video/*,.heic,.heif,.mov,.m4v,.mkv" multiple class="hiddenfile">
-  <button class="btn pri" id="bOut"><span class="outdot" id="outDot"></span><span>Beamer-Ausgabe öffnen</span></button>
-  <button class="btn" id="bSy"><span class="outdot" id="syDot"></span><span>Syphon</span></button>
+  <button class="btn pri" id="bOut" title="Schritt 3: Ausgabe auf dem Beamer öffnen"><i class="stp">3</i><span class="outdot" id="outDot"></span><span>Beamer-Ausgabe öffnen</span></button>
   <button class="btn" id="bPlay">❚❚ Pause</button>
-  <button class="btn" id="bVj" title="VJ-Modus: Pads, Regler und Pedal am MIDI-Gerät steuern die Ausgabe live">🎛 VJ-Modus: aus</button>
-  <button class="btn" id="bLock" title="Mapping sperren / entsperren">🔓 Mapping offen</button>
-  <button class="btn" id="bReset" title="Alle Look-Regler der gewählten Fläche zurücksetzen – Farben, Inhalte und Mapping bleiben">↺ Looks</button>
-  <button class="btn" id="bExport">Loop exportieren</button>
   <div class="sp"></div>
-  <button class="btn sm" id="bSave">Projekt speichern</button>
-  <button class="btn sm" id="bOpen">Projekt öffnen</button>
+  <div class="menuwrap">
+    <button class="btn" id="bMore" aria-haspopup="true" aria-expanded="false">Mehr ▾</button>
+    <div class="menu" id="moreMenu" role="menu">
+      <button class="btn" id="bExport">Loop exportieren</button>
+      <button class="btn" id="bSy"><span class="outdot" id="syDot"></span><span>Syphon</span></button>
+      <button class="btn" id="bVj" title="VJ-Modus: Pads, Regler und Pedal am MIDI-Gerät steuern die Ausgabe live">🎛 VJ-Modus: aus</button>
+      <button class="btn" id="bLock" title="Mapping sperren / entsperren">🔓 Mapping offen</button>
+    </div>
+  </div>
+  <button class="btn sm ico" id="bSave" title="Projekt speichern" aria-label="Projekt speichern">💾</button>
+  <button class="btn sm ico" id="bOpen" title="Projekt öffnen" aria-label="Projekt öffnen">📂</button>
   <input type="file" id="projFile" accept=".artloop,.json,application/json" hidden>
+  <div class="menuwrap">
+    <button class="btn sm ico" id="bHelp" title="Hilfe und Tour" aria-label="Hilfe und Tour" aria-haspopup="true" aria-expanded="false">?</button>
+    <div class="menu" id="helpMenu" role="menu">
+      <button class="btn" id="bTour">▶ Tour starten</button>
+      <button class="btn" id="bTips">Hilfetexte anzeigen</button>
+    </div>
+  </div>
 </header>
 <div id="app">
   <div id="stageCol">
     <div class="tabs">
       <div class="tab act" data-tab="map">Mapping</div>
-      <div class="tab" data-tab="media">Medien</div>
+      <div class="tab" data-tab="media"><i class="stp">2</i>Medien</div>
       <div class="tab" data-tab="scenes">Szenen</div>
       <div class="tab" data-tab="vj">VJ / MIDI</div>
       <div class="tab" data-tab="crop" id="tabCrop" style="display:none">Zuschneiden</div>
       <button class="btn sm pri" id="bCropDone" style="display:none;margin-left:6px">✓ Fertig</button>
       <div class="sp"></div>
-      <button class="btn sm" id="bClean" title="Vorschau ohne Punkte, Linien und Beschriftungen (P). Bearbeiten geht trotzdem weiter.">👁 Saubere Vorschau</button>
-      <button class="btn sm" id="bGrid">Testgitter</button>
-      <button class="btn sm" id="bEdges">Kanten-Ansicht</button>
-      <button class="btn sm" id="bBlack">Schwarz</button>
-      <select id="selAspect" title="Seitenverhältnis des Beamers (wird automatisch übernommen, sobald die Ausgabe offen ist)">
-        <option value="1.7778">16:9</option><option value="1.6">16:10</option><option value="1.3333">4:3</option><option value="1">1:1</option>
-      </select>
+      <div class="menuwrap">
+        <button class="btn sm" id="bView" aria-haspopup="true" aria-expanded="false">Ansicht ▾</button>
+        <div class="menu" id="viewMenu" role="menu">
+          <button class="btn sm" id="bClean" title="Vorschau ohne Punkte, Linien und Beschriftungen (P). Bearbeiten geht trotzdem weiter.">👁 Saubere Vorschau</button>
+          <button class="btn sm" id="bGrid">Testgitter</button>
+          <button class="btn sm" id="bEdges">Kanten-Ansicht</button>
+          <button class="btn sm" id="bBlack">Schwarz</button>
+          <label class="mlabel">Seitenverhältnis
+            <select id="selAspect" title="Seitenverhältnis des Beamers (wird automatisch übernommen, sobald die Ausgabe offen ist)">
+              <option value="1.7778">16:9</option><option value="1.6">16:10</option><option value="1.3333">4:3</option><option value="1">1:1</option>
+            </select></label>
+        </div>
+      </div>
     </div>
     <div class="lockbar">🔒 Mapping ist gesperrt – Punkte, Formen, Zuschnitt und Reihenfolge lassen sich nicht verändern. Entsperren über „🔒 Gesperrt“ oben.</div>
     <div id="stage"><div id="stageInner"><canvas id="pv"></canvas><canvas id="ov"></canvas></div></div>
@@ -182,7 +234,7 @@ select.wide{flex:1;min-width:0}
   </div>
   <aside id="side">
     <div class="panel show" id="panelMap">
-      <div class="box">
+      <div class="box key">
         <h4 class="hrow">Flächen <span><button class="btn sm" id="bAddSurf">+ Fläche</button> <button class="btn sm" id="bDraw" title="Fläche mit Maus oder Finger zeichnen">✎ Zeichnen</button></span></h4>
         <div id="layers"></div>
         <div class="hint" style="margin:4px 0 0">Klick wählt eine Fläche, oben liegt vorne. 👁 ausblenden · ⧉ duplizieren · ✕ löschen. Inhalte kommen im Tab „Medien“ auf die Flächen.</div>
@@ -204,7 +256,7 @@ select.wide{flex:1;min-width:0}
         <div class="hint" id="cutHint" style="margin:6px 0 0"></div>
       </div>
       <div class="box" id="looks">
-        <h4>Looks <span class="hint" style="font-weight:400">(für die gewählte Fläche)</span></h4>
+        <h4 class="hrow"><span>Looks <span class="hint" style="font-weight:400">(für die gewählte Fläche)</span></span><button class="btn sm" id="bReset" title="Alle Look-Regler der gewählten Fläche zurücksetzen – Farben, Inhalte und Mapping bleiben">↺ Looks zurücksetzen</button></h4>
         <div id="presets"></div>
         <div class="learn">
           <button class="btn" id="bLike" title="Diesen Look merken – ArtLoop lernt daraus">👍 Gefällt mir</button>
@@ -229,30 +281,30 @@ select.wide{flex:1;min-width:0}
       </details>
     </div>
     <div class="panel" id="panelMedia">
-      <div class="box">
+      <div class="box key">
         <h4 class="hrow">Medien <span><label class="btn sm" for="file">+ Datei</label> <button class="btn sm" id="bAddCam">+ Kamera</button> <button class="btn sm" id="bAddText">+ Text</button> <button class="btn sm" id="bAddColor" title="Einfarbige Fläche mit frei wählbarer Farbe">+ Farbe</button></span></h4>
         <div id="mediaList"></div>
         <div class="hint" style="margin:4px 0 0">Datei wählen, dann im Bild links auf Flächen klicken: dort läuft sie. Nochmal klicken nimmt sie weg. Oben liegt vorne.</div>
       </div>
-      <div class="box" id="mediaEmpty"><div class="hint" style="margin:0">Wähle eine Datei aus der Liste – oder importiere Bilder und Videos, starte eine Kamera oder lege einen Text an.</div></div>
+      <div class="box" id="mediaEmpty"><div class="hint keep" style="margin:0">Wähle eine Datei aus der Liste – oder importiere Bilder und Videos, starte eine Kamera oder lege einen Text an.</div></div>
       <div id="mediaProps">
-        <div class="box"><h4>Läuft auf</h4><div class="chips" id="assignChips"></div>
+        <div class="box key"><h4>Läuft auf</h4><div class="chips" id="assignChips"></div>
           <div class="btnrow" style="margin:8px 0 0"><button class="btn sm" id="bAssignAll">Auf alle Flächen</button><button class="btn sm" id="bAssignNone">Von allen entfernen</button></div></div>
-        <div class="box" id="mpPlay"><h4>Wiedergabe</h4>
+        <div class="box key" id="mpPlay"><h4>Wiedergabe</h4>
           <div class="btnrow"><button class="btn sm" id="bMPlay">❚❚ Pause</button><button class="btn sm" id="bMRestart">⟲ Neustart</button><button class="btn sm" id="bMMute">🔇 Ton aus</button></div>
           <div id="mpPlayRows"></div></div>
-        <div class="box" id="mpCam"><h4>Kamera</h4>
+        <div class="box key" id="mpCam"><h4>Kamera</h4>
           <div class="frow"><select id="camSel" class="wide"></select></div>
           <div class="btnrow"><button class="btn sm pri" id="bCamStart">Kamera starten</button><button class="btn sm" id="bCamStop">Stoppen</button></div>
           <div class="hint" id="camHint" style="margin:0"></div></div>
-        <div class="box" id="mpText"><h4>Text</h4>
+        <div class="box key" id="mpText"><h4>Text</h4>
           <textarea id="tText" maxlength="5000" rows="3"></textarea>
           <div class="frow"><select id="tFont" class="wide" title="Schriftart"></select><label class="btn sm" for="tFontFile" title="Eigene Schrift laden (.ttf, .otf, .woff, .woff2)">Schrift laden</label>
             <input type="file" id="tFontFile" accept=".ttf,.otf,.woff,.woff2" class="hiddenfile"></div>
           <div class="frow"><label>Farbe <input type="color" id="tColor"></label><label><input type="checkbox" id="tBgOn"> Hintergrund</label><input type="color" id="tBg"></div>
           <div class="frow"><span class="seg" id="tAlign"><button data-v="left">Links</button><button data-v="center">Mitte</button><button data-v="right">Rechts</button></span><label><input type="checkbox" id="tUpper"> GROSS</label></div>
           <div id="tRows"></div></div>
-        <div class="box" id="mpColor"><h4>Farbfläche</h4>
+        <div class="box key" id="mpColor"><h4>Farbfläche</h4>
           <div class="frow"><label>Farbe <input type="color" id="mColor"></label></div>
           <div class="chips" id="mColorSw"></div>
           <div class="hint" style="margin:6px 0 0">Eine einfarbige Fläche – z. B. als Hintergrund unter anderen Medien oder als Farbblitz im VJ-Modus.</div></div>
@@ -273,15 +325,14 @@ select.wide{flex:1;min-width:0}
       </div>
     </div>
     <div class="panel" id="panelVj">
-      <div class="box">
+      <div class="box key">
         <h4 class="hrow">VJ-Modus <button class="btn sm" id="bVj2">Einschalten</button></h4>
         <div class="hint" id="vjStatus"></div>
         <div class="hint" id="vjLast" style="margin-top:-4px"></div>
         <div class="hint">Zuordnen: bei einer Zeile auf „Lernen“ klicken, dann das Pad bzw. den Regler am Gerät bewegen – <b>oder eine Taste der Laptop-Tastatur drücken</b>. Zugeordnete Tasten haben im VJ-Modus Vorrang vor den normalen Kurzbefehlen. Die Zuordnung bleibt in diesem Browser gespeichert. Esc bricht ab. Regler und Tasten wirken auf das Medium, dessen Pad zuletzt gedrückt wurde (oder das im Tab „Medien“ gewählte).</div>
       </div>
       <div class="box"><h4>Pads: Medium nur sichtbar, solange gedrückt</h4><div class="hint">Medien ohne Pad bleiben wie gewohnt sichtbar. Mit gehaltenem Sustain-Pedal bleiben losgelassene Pads an, bis das Pedal losgelassen wird.</div><div id="vjPads"></div></div>
-      <div class="box"><h4>Regler (für das aktuelle Medium)</h4><div id="vjKnobs"></div></div>
-      <div class="box"><h4>Regler per Tastatur</h4><div class="hint">Taste halten = Wert steigt bzw. sinkt stetig.</div><div id="vjKeys"></div></div>
+      <div class="box"><h4>Regler (für das aktuelle Medium)</h4><div class="hint">Nur für Fader/Drehregler am MIDI-Gerät. Sie wirken auf das hier gewählte Medium (wechselt auch mit dem zuletzt gedrückten Pad):</div><div class="chips" id="vjCur" style="margin-bottom:8px"></div><div id="vjKnobs"></div></div>
       <div class="box"><h4>Tasten</h4><div id="vjBtns"></div></div>
       <div class="box"><h4>Szenen aufrufen</h4><div id="vjScenes"></div></div>
       <div class="box"><button class="btn sm" id="bVjClear">Alle Zuordnungen löschen</button></div>
@@ -331,6 +382,13 @@ select.wide{flex:1;min-width:0}
   <div class="hint" id="syStatus">Nicht verbunden.</div>
   <div class="btnrow" style="justify-content:flex-end"><button class="btn" id="syClose">Schließen</button><button class="btn pri" id="syGo">Senden starten</button></div>
 </div></div>
+<div id="tourAsk"><div class="card" role="dialog" aria-modal="true" aria-labelledby="tourAskT">
+  <h3 id="tourAskT">Willkommen bei ArtLoop</h3>
+  <p style="margin:0 0 14px;color:#c9cdd6;line-height:1.5">Eine kurze Tour zeigt dir in 7 Schritten die wichtigsten Funktionen. Du kannst sie jederzeit überspringen und später über das „?“ oben rechts starten.</p>
+  <div class="btnrow" style="justify-content:flex-end;margin:0"><button class="btn" id="tourSkip">Überspringen</button><button class="btn pri" id="tourStart">Tour starten</button></div>
+</div></div>
+<div id="tourDim"><div id="tourHole"></div><div id="tourPop" role="dialog" aria-live="polite"><h3 id="tourT"></h3><p id="tourP"></p>
+  <div class="tnav"><span class="tcount" id="tourN"></span><button class="btn sm" id="tourEnd">Überspringen</button><button class="btn sm" id="tourBack">Zurück</button><button class="btn sm pri" id="tourNext">Weiter</button></div></div></div>
 <div id="toast"></div>
 
 <script>"use strict";
@@ -1466,7 +1524,7 @@ function mkRow(r){
 function buildControls(){
   const root=$('controls');
   UI.forEach(sec=>{
-    const det=document.createElement('details'); if(sec.open) det.open=true;
+    const det=document.createElement('details');
     det.innerHTML=`<summary>${sec.title}</summary>`; const box=document.createElement('div'); box.className='ctl'; det.appendChild(box);
     if(sec.effects) box.insertAdjacentHTML('beforeend','<div class="hint">Jeder Regler ist ein eigener Effekt. Bei 0 % ist er aus; „⋯“ zeigt Feineinstellungen.</div>');
     if(sec.colors){
@@ -2794,11 +2852,11 @@ function renderScenes(){
 const VJ={on:false,access:null,err:'',ins:[],binds:{},map:new Map(),gated:new Set(),learn:null,
   down:new Set(),sust:new Set(),shown:new Set(),pedal:false,cur:0,srcOn:new Map(),last:'',dirty:false,ui:false};
 const VJ_KNOBS=[['opacity','Deckkraft'],['scale','Größe'],['rot','Drehung'],['zoom','Zoom'],['blur','Weichzeichnen']];
-const VJ_BTNS=[['tog:inv','Invertieren (an/aus)'],['tog:bw','Schwarzweiß (an/aus)'],['tog:black','Ausgabe schwarz (an/aus)'],['pedal','Sustain halten (Taste halten)']];
-const VJ_TGT=/^((par|pup|pdn):(opacity|scale|rot|zoom|blur)|tog:(inv|bw|black)|pedal|vis:\d{1,9}|scene:\d{1,9})$/, VJ_SRC=/^([nc]:\d{1,2}:\d{1,3}|k:[A-Za-z0-9]{1,20})$/;
+const VJ_BTNS=[['tog:inv','Invertieren (an/aus)'],['tog:bw','Schwarzweiß (an/aus)'],['pedal','Sustain halten (Taste halten)']];
+const VJ_TGT=/^(par:(opacity|scale|rot|zoom|blur)|tog:(inv|bw)|pedal|vis:\d{1,9}|scene:\d{1,9})$/, VJ_SRC=/^([nc]:\d{1,2}:\d{1,3}|k:[A-Za-z0-9]{1,20})$/;
 function vjLoad(){
   try{ const j=JSON.parse(localStorage.getItem('artloop.midi')||'null');
-    if(j&&j.binds&&typeof j.binds==='object') for(const t in j.binds) if(VJ_TGT.test(t)&&VJ_SRC.test(String(j.binds[t]))) VJ.binds[t]=j.binds[t]; }catch(e){}
+    if(j&&j.binds&&typeof j.binds==='object') for(const t in j.binds) if(VJ_TGT.test(t)&&VJ_SRC.test(String(j.binds[t]))&&!(t.startsWith('par:')&&String(j.binds[t])[0]==='k')) VJ.binds[t]=j.binds[t]; }catch(e){}
   vjRebuild();
 }
 function vjSave(){ try{localStorage.setItem('artloop.midi',JSON.stringify({binds:VJ.binds}));}catch(e){} }
@@ -2836,7 +2894,9 @@ function vjIn(t,ch,n,v,on){ vjDispatch(t+':'+ch+':'+n,v,on); }
 // Gemeinsamer Weg für MIDI und Laptop-Tastatur
 function vjDispatch(key,v,on){
   VJ.last=vjSrcLabel(key)+(key[0]==='k'?(on?' gedrückt':' losgelassen'):' · Wert '+v); VJ.dirty=true;
-  if(VJ.learn){ if(!on&&key[0]!=='c') return; vjLearnDone(key); return; }
+  if(VJ.learn){ if(!on&&key[0]!=='c') return;
+    if(VJ.learn.startsWith('par:')&&key[0]!=='c'){ if(key[0]==='k') toast('Regler gehen nur mit einem Fader/Drehregler am MIDI-Gerät, nicht mit Tasten.',4000); return; }
+    vjLearnDone(key); return; }
   if(!VJ.on) return;
   const was=VJ.srcOn.get(key)||false; VJ.srcOn.set(key,on);
   const tg=VJ.map.get(key); if(!tg) return;
@@ -2857,9 +2917,6 @@ function vjRun(id,v,on,rise){
   if(k==='par'){
     const m=vjMedia(), r=MP.find(x=>x.k===a); if(!m||!r) return;
     let x=r.min+(r.max-r.min)*v/127; x=Math.round(x/r.step)*r.step; m.p[a]=cleanNum(+x.toFixed(4),r.min,r.max,r.def); VJ.ui=true; saveLocal();
-  } else if(k==='pup'||k==='pdn'){
-    if(!on) return; const m=vjMedia(), r=MP.find(x=>x.k===a); if(!m||!r) return;
-    m.p[a]=cleanNum(+(m.p[a]+(k==='pup'?1:-1)*(r.max-r.min)*.03).toFixed(4),r.min,r.max,r.def); VJ.ui=true; saveLocal();
   } else if(k==='pedal'){ if(on!==VJ.pedal) vjPedal(on);
   } else if(k==='vis'){
     const mid=+a, m=S.media.find(x=>x.id===mid); if(!m) return;
@@ -2867,7 +2924,7 @@ function vjRun(id,v,on,rise){
     else { VJ.down.delete(mid); if(VJ.pedal) VJ.sust.add(mid); else VJ.shown.delete(mid); }
   } else if(k==='tog'){
     if(!rise) return;
-    if(a==='black') toggleBlack(); else { const m=vjMedia(); if(m){ m.p[a]=m.p[a]>=.5?0:1; VJ.ui=true; saveLocal(); } }
+    const m=vjMedia(); if(m){ m.p[a]=m.p[a]>=.5?0:1; VJ.ui=true; saveLocal(); }
   } else if(k==='scene'){ if(rise) recallScene(+a); }
 }
 function vjLearnDone(key){
@@ -2907,13 +2964,21 @@ function vjRow(box,tgt,label,extra){
     h.addEventListener('pointerdown',dn); h.addEventListener('pointerup',up); h.addEventListener('pointerleave',up); }
   box.appendChild(row);
 }
+function renderVjCur(){
+  const box=$('vjCur'); if(!box) return; const cur=vjMedia(), id=cur?cur.id:0;
+  if(box.dataset.k===S.media.map(m=>m.id+m.name).join('|')+'#'+id) return;
+  box.dataset.k=S.media.map(m=>m.id+m.name).join('|')+'#'+id; box.innerHTML='';
+  if(!S.media.length){ box.innerHTML='<div class="hint">Noch keine Medien.</div>'; return; }
+  S.media.forEach(m=>{ const c=document.createElement('span'); c.className='chip'+(m.id===id?' act':''); c.textContent=m.name; c.title=m.name;
+    c.onclick=()=>{ vjCur(m); renderVjCur(); saveLocal(); }; box.appendChild(c); });
+}
 function renderVj(){
   const pads=$('vjPads'); if(!pads) return; renderVjStatus();
-  pads.innerHTML=''; $('vjKeys').innerHTML=''; $('vjKnobs').innerHTML=''; $('vjBtns').innerHTML=''; $('vjScenes').innerHTML='';
+  pads.innerHTML=''; $('vjKnobs').innerHTML=''; $('vjBtns').innerHTML=''; $('vjScenes').innerHTML='';
   if(!S.media.length) pads.innerHTML='<div class="hint">Noch keine Medien.</div>';
   S.media.forEach(m=>vjRow(pads,'vis:'+m.id,m.name+' ('+KIND[m.kind]+')',true));
   VJ_KNOBS.forEach(([k,l])=>vjRow($('vjKnobs'),'par:'+k,l));
-  VJ_KNOBS.forEach(([k,l])=>{ vjRow($('vjKeys'),'pup:'+k,l+' ＋'); vjRow($('vjKeys'),'pdn:'+k,l+' －'); });
+  renderVjCur();
   VJ_BTNS.forEach(([t,l])=>vjRow($('vjBtns'),t,l));
   if(!S.scenes.length) $('vjScenes').innerHTML='<div class="hint">Noch keine Szenen (Tab „Szenen“).</div>';
   S.scenes.forEach(sc=>vjRow($('vjScenes'),'scene:'+sc.id,sc.name));
@@ -2922,7 +2987,7 @@ function renderVj(){
 function vjTick(){
   VJ.dirty=false;
   if(tab==='vj'){ const el=$('vjLast'); if(el) el.textContent='Letzte Nachricht: '+(VJ.last||'–');
-    document.querySelectorAll('#vjPads .mrow').forEach(r=>r.classList.toggle('live',VJ.on&&VJ.shown.has(+r.dataset.t.slice(4)))); renderVjStatus(); }
+    document.querySelectorAll('#vjPads .mrow').forEach(r=>r.classList.toggle('live',VJ.on&&VJ.shown.has(+r.dataset.t.slice(4)))); renderVjStatus(); renderVjCur(); }
   if(VJ.ui||VJ.sel){ const sel=VJ.sel; VJ.ui=VJ.sel=false;
     if(tab==='media'){ if(sel){ renderMedia(); refreshMediaUI(); } else { const m=M(); if(m){ for(const k in MS) MS[k].set(m.p[k]); $('bMInv').classList.toggle('on',m.p.inv>=.5); $('bMBw').classList.toggle('on',m.p.bw>=.5); } } } }
 }
@@ -2953,6 +3018,20 @@ on('syGo',()=>{SY.ws?syStop():syStart();});
 on('syDl',downloadPy);
 on('bLike',like); on('bDislike',dislike); on('bSuggest',()=>suggest(false)); on('bVary',varyParams);
 on('bForget',()=>{if(confirm('Alle Bewertungen und „Meine Looks“ löschen?')){Taste.likes=[];Taste.dislikes=[];saveTaste();buildPresets();}});
+// Alle Bereiche starten eingeklappt; Klick auf die Überschrift klappt auf/zu
+document.querySelectorAll('aside .panel').forEach(pn=>{
+  const boxes=[...pn.querySelectorAll('.box')].filter(b=>b.firstElementChild&&b.firstElementChild.tagName==='H4');
+  if(boxes.length<2) return; // einzelner Bereich im Tab bleibt offen
+  boxes.forEach(b=>{
+    b.classList.add('fold');
+    const h=b.firstElementChild, c=document.createElement('span'); c.className='chev'; c.textContent='▸'; h.prepend(c);
+    if(b.classList.contains('key')){b.classList.add('open'); c.textContent='▾';}
+    h.addEventListener('click',e=>{
+      if(e.target.closest('button,label,input,select,a')) return;
+      b.classList.toggle('open'); c.textContent=b.classList.contains('open')?'▾':'▸';
+    });
+  });
+});
 on('bSave',saveProject); on('bOpen',()=>$('projFile').click());
 $('projFile').onchange=e=>{if(e.target.files[0])openProject(e.target.files[0]);e.target.value='';};
 $('selAspect').onchange=e=>{S.outAspect=+e.target.value;S.layers.forEach(computeRect);saveLocal();};
@@ -3014,6 +3093,70 @@ updateOutBtn();
 refreshAll(); setTab('map');
 requestAnimationFrame(frame);
 ready.then(()=>{refreshAll();});
+
+/* ---------- Schlanke Oberfläche: Menüs, Hilfetexte, Tour ---------- */
+(function(){
+  const lsGet=k=>{try{return localStorage.getItem(k);}catch(e){return null;}};
+  const lsSet=(k,v)=>{try{localStorage.setItem(k,v);}catch(e){}};
+  const menus=[['bMore','moreMenu'],['bView','viewMenu'],['bHelp','helpMenu']].map(([b,m])=>({b:$(b),m:$(m)}));
+  const closeMenus=except=>menus.forEach(o=>{if(o!==except){o.m.classList.remove('show');o.b.setAttribute('aria-expanded','false');}});
+  menus.forEach(o=>{
+    o.b.addEventListener('click',e=>{e.stopPropagation();const open=!o.m.classList.contains('show');closeMenus(o);o.m.classList.toggle('show',open);o.b.setAttribute('aria-expanded',String(open));});
+    o.m.addEventListener('click',e=>{if(e.target.closest('button')&&!e.target.closest('select'))closeMenus();});
+  });
+  document.addEventListener('click',e=>{if(!e.target.closest('.menuwrap'))closeMenus();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenus();});
+  // Hilfetexte
+  const setTips=on=>{document.body.classList.toggle('tips',on);$('bTips').textContent=on?'Hilfetexte ausblenden':'Hilfetexte anzeigen';lsSet('artloop.tips',on?'1':'0');};
+  setTips(lsGet('artloop.tips')==='1');
+  $('bTips').addEventListener('click',()=>setTips(!document.body.classList.contains('tips')));
+  // Tour
+  const STEPS=[
+    {sel:'#bLoad',t:'1 · Datei importieren',p:'Hier holst du Bilder und Videos ins Programm. Du kannst sie auch einfach ins Fenster ziehen oder einfügen.'},
+    {sel:'.tab[data-tab="media"]',tab:'media',t:'2 · Medium auf eine Fläche legen',p:'Im Tab „Medien“ wählst du eine Datei, dann klickst du im Bild auf die Fläche, auf der sie laufen soll. Nochmal klicken nimmt sie wieder weg.'},
+    {sel:'#stage',tab:'map',t:'Mapping: Fläche anpassen',p:'Ziehe die Eckpunkte im Bild auf deine Projektionsfläche. Im Tab „Mapping“ stellst du Form und Looks ein.'},
+    {sel:'#side',tab:'map',t:'Bereiche einklappen',p:'Hier ist nur das Wichtigste aufgeklappt (blau markiert). Klicke auf eine Überschrift, um weitere Bereiche zu öffnen.'},
+    {sel:'#bOut',t:'3 · Beamer-Ausgabe öffnen',p:'Öffnet das Ausgabefenster. Auf den Beamer ziehen, dort Doppelklick für Vollbild.'},
+    {sel:'#bMore',t:'Mehr: Export, Syphon, VJ, Sperren',p:'Selten gebrauchte Funktionen sind hier gesammelt: Loop als Video exportieren, Syphon, VJ-Modus und Mapping sperren.'},
+    {sel:'#bSave',t:'Projekt speichern',p:'Sichert dein Projekt als Datei. Mit dem „?“ rechts daneben startest du diese Tour jederzeit erneut.'},
+  ];
+  let ti=-1;
+  const dim=$('tourDim'), hole=$('tourHole'), pop=$('tourPop');
+  function place(){
+    const st=STEPS[ti]; if(!st) return;
+    const el=document.querySelector(st.sel), pad=6;
+    let r=el?el.getBoundingClientRect():{left:innerWidth/2-1,top:innerHeight/2-1,width:2,height:2,right:innerWidth/2+1,bottom:innerHeight/2+1};
+    hole.style.left=(r.left-pad)+'px'; hole.style.top=(r.top-pad)+'px'; hole.style.width=(r.width+pad*2)+'px'; hole.style.height=(r.height+pad*2)+'px';
+    const pw=pop.offsetWidth, ph=pop.offsetHeight, m=12;
+    let x=Math.min(Math.max(8,r.left),innerWidth-pw-8), y=r.bottom+pad+m;
+    if(y+ph>innerHeight-8){ y=r.top-pad-m-ph; }
+    if(y<8){ y=Math.min(innerHeight-ph-8,Math.max(8,r.top+12)); x=Math.min(Math.max(8,r.right+pad+m),innerWidth-pw-8); if(x<r.right&&r.width>innerWidth*.5){x=Math.max(8,r.left+12);} }
+    pop.style.left=x+'px'; pop.style.top=y+'px';
+  }
+  function show(i){
+    ti=i; const st=STEPS[i];
+    if(st.tab&&typeof setTab==='function'&&tab!==st.tab) setTab(st.tab);
+    $('tourT').textContent=st.t; $('tourP').textContent=st.p; $('tourN').textContent=(i+1)+' / '+STEPS.length;
+    $('tourBack').style.visibility=i?'visible':'hidden';
+    $('tourNext').textContent=i===STEPS.length-1?'Fertig':'Weiter';
+    $('tourEnd').style.display=i===STEPS.length-1?'none':'';
+    dim.classList.add('show'); place(); $('tourNext').focus();
+  }
+  function end(){ti=-1;dim.classList.remove('show');$('tourAsk').classList.remove('show');lsSet('artloop.tour','done');if(typeof setTab==='function'&&tab!=='map')setTab('map');}
+  const start=()=>{closeMenus();$('tourAsk').classList.remove('show');show(0);};
+  $('tourStart').addEventListener('click',start); $('bTour').addEventListener('click',start);
+  $('tourSkip').addEventListener('click',end); $('tourEnd').addEventListener('click',end);
+  $('tourBack').addEventListener('click',()=>{if(ti>0)show(ti-1);});
+  $('tourNext').addEventListener('click',()=>{ti>=STEPS.length-1?end():show(ti+1);});
+  window.addEventListener('resize',()=>{if(ti>=0)place();});
+  document.addEventListener('keydown',e=>{
+    if(ti<0) return;
+    if(e.key==='Escape'){end();e.stopPropagation();e.preventDefault();}
+    else if(e.key==='ArrowRight'||e.key==='Enter'){$('tourNext').click();e.stopPropagation();e.preventDefault();}
+    else if(e.key==='ArrowLeft'){$('tourBack').click();e.stopPropagation();e.preventDefault();}
+  },true);
+  if(lsGet('artloop.tour')!=='done') setTimeout(()=>$('tourAsk').classList.add('show'),600);
+})();
 // Offline / als App installierbar (nur über https oder localhost)
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1')){
   window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
@@ -3336,199 +3479,6 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\nBeendet.")
-</script>
-<script>
-/* Upload-Animation (rein dekorativ, blockiert nichts, ändert keine App-Logik). */
-(function () {
-'use strict';
-var NS = 'http://www.w3.org/2000/svg';
-var clamp = function (x, a, b) { return Math.min(b === undefined ? 1 : b, Math.max(a === undefined ? 0 : a, x)); };
-var seg = function (t, a, b) { return clamp((t - a) / (b - a)); };
-var lerp = function (a, b, x) { return a + (b - a) * x; };
-var eo = function (x) { return 1 - Math.pow(1 - x, 3); };
-var ei = function (x) { return x * x; };
-var eio = function (x) { return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2; };
-var back = function (x) { var c = 2.70158; return 1 + c * Math.pow(x - 1, 3) + (c - 1) * Math.pow(x - 1, 2); };
-function svgEl(tag, attrs, parent) {
-  var e = document.createElementNS(NS, tag);
-  for (var k in attrs) e.setAttribute(k, attrs[k]);
-  if (parent) parent.appendChild(e);
-  return e;
-}
-function htmlEl(tag, cls, parent) {
-  var e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (parent) parent.appendChild(e);
-  return e;
-}
-
-var st = document.createElement('style');
-st.textContent = ".ufx{position:fixed;left:50%;bottom:22px;z-index:2147483000;width:324px;padding:12px;background:#14161b;border:1px solid #2a2e38;border-radius:16px;box-shadow:0 18px 50px rgba(0,0,0,.55);font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;pointer-events:none;opacity:0;transform:translateX(-50%) translateY(18px) scale(var(--s,1));transform-origin:50% 100%;transition:opacity .3s ease,transform .45s cubic-bezier(.2,1.2,.4,1)}.ufx.in{opacity:1;transform:translateX(-50%) translateY(0) scale(var(--s,1))}.ufx-stage{position:relative;width:300px;height:180px;overflow:hidden;border-radius:10px;background:rgba(255,255,255,.02)}.ufx-stage svg{display:block}.ufx-row{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;margin-top:8px}.ufx-nm{color:#e7e9ee;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}.ufx-st{color:#3ff0ff;white-space:nowrap;flex:0 0 auto}.ufx-bar{height:3px;border-radius:3px;background:rgba(255,255,255,.1);margin-top:7px;overflow:hidden}.ufx-bar i{display:block;height:100%;width:0;background:#3ff0ff}.ufx.done .ufx-bar i{background:#34d399}.ufx.done .ufx-st{color:#34d399}";
-document.head.appendChild(st);
-
-var cur = null;
-function stop() {
-  if (!cur) return;
-  cancelAnimationFrame(cur.raf); clearTimeout(cur.to1); clearTimeout(cur.to2);
-  if (cur.cleanup) cur.cleanup();
-  cur.node.remove(); cur = null;
-}
-
-function play(file, kind, extra) {
-  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  stop();
-  var node = htmlEl('div', 'ufx', document.body);
-  node.setAttribute('aria-hidden', 'true');
-  node.style.setProperty('--s', String(Math.min(1, (window.innerWidth - 24) / 324)));
-  var stage = htmlEl('div', 'ufx-stage', node);
-  var row = htmlEl('div', 'ufx-row', node);
-  var nm = htmlEl('span', 'ufx-nm', row);
-  var stt = htmlEl('span', 'ufx-st', row);
-  var bar = htmlEl('div', 'ufx-bar', node);
-  var fill = htmlEl('i', '', bar);
-  nm.textContent = file.name + (extra > 0 ? '  +' + extra : '');
-  var scene = SCENE.build(stage, kind, file);
-  var state = { node: node, cleanup: scene.cleanup };
-  cur = state;
-  requestAnimationFrame(function () { node.classList.add('in'); });
-  var t0 = performance.now(), last = '';
-  (function step(now) {
-    if (cur !== state) return;
-    var t = now - t0;
-    scene.render(Math.min(t, scene.dur));
-    var s = scene.status(Math.min(t, scene.dur));
-    if (s !== last) { stt.textContent = s; last = s; }
-    fill.style.width = (clamp(t / scene.dur) * 100).toFixed(1) + '%';
-    if (t < scene.dur) { state.raf = requestAnimationFrame(step); return; }
-    node.classList.add('done');
-    state.to1 = setTimeout(function () {
-      node.classList.remove('in');
-      state.to2 = setTimeout(function () { if (cur === state) stop(); }, 400);
-    }, 900);
-  })(t0);
-}
-
-/* Szene: Bild/Video wird auf eine Fläche gemappt – Eckpunkte erscheinen, die Fläche verzerrt sich
-   perspektivisch, ein Projektorstrahl leuchtet auf, das Motiv läuft im Loop (Farbwechsel) */
-var SCENE = {
-  build: function (stage, kind, file) {
-    var ACC = '#3ff0ff', ACC2 = '#5b6cff', LINE = '#2a2e38';
-    stage.style.width = '300px'; stage.style.height = '180px';
-    var uid = 'ufxbeam' + Math.floor(Math.random() * 1e6);
-    var bg = svgEl('svg', { viewBox: '0 0 300 180', width: '300', height: '180' }, stage);
-    bg.style.position = 'absolute'; bg.style.left = '0'; bg.style.top = '0';
-    var defs = svgEl('defs', {}, bg);
-    var grad = svgEl('linearGradient', { id: uid, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
-    svgEl('stop', { offset: '0', 'stop-color': ACC, 'stop-opacity': 0.34 }, grad);
-    svgEl('stop', { offset: '1', 'stop-color': ACC, 'stop-opacity': 0.02 }, grad);
-    var beam = svgEl('polygon', { fill: 'url(#' + uid + ')', opacity: 0 }, bg);
-    svgEl('rect', { x: 140, y: 0, width: 20, height: 6, rx: 2, fill: '#3a4152' }, bg);
-    // Das Motiv: echtes Vorschaubild bei Bildern, sonst Verlauf mit Play-Symbol
-    var W = 120, H = 80, img = htmlEl('div', '', stage), url = null;
-    img.style.cssText = 'position:absolute;left:0;top:0;width:' + W + 'px;height:' + H + 'px;transform-origin:0 0;border-radius:4px;overflow:hidden;will-change:transform;opacity:0;';
-    var grd = 'linear-gradient(135deg,' + ACC + ',' + ACC2 + ' 60%,#ff6bd6)';
-    if (kind === 'image') { url = URL.createObjectURL(file); img.style.background = 'url("' + url + '") center/cover no-repeat,' + grd; }
-    else img.style.background = grd;
-    if (kind === 'video') {
-      var pl = htmlEl('div', '', img);
-      pl.style.cssText = 'position:absolute;left:50%;top:50%;margin:-14px 0 0 -10px;border-left:22px solid rgba(255,255,255,.92);border-top:14px solid transparent;border-bottom:14px solid transparent;';
-    }
-    var sheen = htmlEl('div', '', img);
-    sheen.style.cssText = 'position:absolute;inset:0;background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.55) 50%,transparent 65%);transform:translateX(-100%);';
-    var fg = svgEl('svg', { viewBox: '0 0 300 180', width: '300', height: '180' }, stage);
-    fg.style.position = 'absolute'; fg.style.left = '0'; fg.style.top = '0';
-    var outline = svgEl('polygon', { fill: 'none', stroke: ACC, 'stroke-width': 1.3, 'stroke-dasharray': '4 3', opacity: 0 }, fg);
-    var hs = []; for (var i = 0; i < 4; i++) hs.push(svgEl('rect', { width: 9, height: 9, rx: 2, fill: '#0c0d10', stroke: ACC, 'stroke-width': 2, opacity: 0 }, fg));
-    var loop = svgEl('g', { opacity: 0 }, fg);
-    svgEl('path', { d: 'M-8 0 A8 8 0 1 1 -3 7.4', fill: 'none', stroke: ACC, 'stroke-width': 2.2, 'stroke-linecap': 'round' }, loop);
-    svgEl('path', { d: 'M-8 7 L-3 7.6 L-5.6 3', fill: 'none', stroke: ACC, 'stroke-width': 2.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, loop);
-    var txt = svgEl('text', { x: 0, y: 22, 'text-anchor': 'middle', 'font-size': 8, 'font-weight': 700, fill: ACC, 'letter-spacing': '.1em' }, loop); txt.textContent = 'LOOP';
-
-    var rect = function (x, y, w, h) { return [[x, y], [x + w, y], [x + w, y + h], [x, y + h]]; };
-    var START = rect(14, 118, 54, 36), FLAT = rect(90, 56, 120, 80), QUAD = [[98, 34], [216, 58], [206, 142], [86, 112]];
-    var mix = function (A, B, e, lift) { return A.map(function (p, i) { return [lerp(p[0], B[i][0], e), lerp(p[1], B[i][1], e) - (lift || 0)]; }); };
-
-    function solve(A, b) { // Gauss-Elimination (8x8)
-      var n = b.length, M = A.map(function (r, i) { return r.concat([b[i]]); }), i, j, k;
-      for (i = 0; i < n; i++) {
-        var p = i; for (j = i + 1; j < n; j++) if (Math.abs(M[j][i]) > Math.abs(M[p][i])) p = j;
-        var tmp = M[i]; M[i] = M[p]; M[p] = tmp;
-        if (Math.abs(M[i][i]) < 1e-9) return null;
-        for (j = i + 1; j < n; j++) { var f = M[j][i] / M[i][i]; for (k = i; k <= n; k++) M[j][k] -= f * M[i][k]; }
-      }
-      var x = new Array(n);
-      for (i = n - 1; i >= 0; i--) { var s = M[i][n]; for (j = i + 1; j < n; j++) s -= M[i][j] * x[j]; x[i] = s / M[i][i]; }
-      return x;
-    }
-    function homography(q) {
-      var src = [[0, 0], [W, 0], [W, H], [0, H]], A = [], b = [];
-      for (var i = 0; i < 4; i++) {
-        var x = src[i][0], y = src[i][1], u = q[i][0], v = q[i][1];
-        A.push([x, y, 1, 0, 0, 0, -u * x, -u * y]); b.push(u);
-        A.push([0, 0, 0, x, y, 1, -v * x, -v * y]); b.push(v);
-      }
-      var h = solve(A, b); if (!h) return null;
-      return 'matrix3d(' + [h[0], h[3], 0, h[6], h[1], h[4], 0, h[7], 0, 0, 1, 0, h[2], h[5], 0, 1].map(function (n) { return n.toFixed(6); }).join(',') + ')';
-    }
-    var T_IN = 340, T_F0 = 420, T_F1 = 1050, T_W0 = 1300, T_W1 = 2000, T_END = 3300;
-
-    return {
-      dur: T_END,
-      cleanup: function () { if (url) URL.revokeObjectURL(url); },
-      status: function (t) { return t < T_F1 ? 'Wird geladen …' : t < T_W1 ? 'Fläche wird angepasst …' : 'Gemappt · läuft im Loop'; },
-      render: function (t) {
-        var q;
-        if (t < T_F0) {
-          var c = back(seg(t, 0, T_IN)), cx = 41, cy = 136;
-          q = START.map(function (p) { return [cx + (p[0] - cx) * c, cy + (p[1] - cy) * c]; });
-        } else if (t < T_W0) {
-          var f = eio(seg(t, T_F0, T_F1)); q = mix(START, FLAT, f, 34 * Math.sin(Math.PI * f));
-        } else {
-          var w = back(seg(t, T_W0, T_W1)); q = mix(FLAT, QUAD, w);
-        }
-        var m = homography(q);
-        if (m) img.style.transform = m;
-        img.style.opacity = clamp(t / 120);
-        var hue = t > T_W1 ? ((t - T_W1) / 1100) * 360 : 0;
-        img.style.filter = hue ? 'hue-rotate(' + hue.toFixed(0) + 'deg) saturate(1.2)' : '';
-        sheen.style.transform = 'translateX(' + (t > T_W1 - 150 ? lerp(-100, 100, ((t - (T_W1 - 150)) % 1100) / 1100) : -100).toFixed(1) + '%)';
-        var showH = seg(t, T_F1 - 60, T_F1 + 180);
-        outline.setAttribute('points', q.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' '));
-        outline.setAttribute('opacity', (0.85 * showH).toFixed(2));
-        for (var i = 0; i < 4; i++) {
-          var hp = back(clamp(seg(t, T_F1 - 60 + i * 60, T_F1 + 200 + i * 60)));
-          hs[i].setAttribute('transform', 'translate(' + (q[i][0] - 4.5).toFixed(1) + ' ' + (q[i][1] - 4.5).toFixed(1) + ') scale(' + Math.max(0, hp).toFixed(3) + ')');
-          hs[i].setAttribute('opacity', showH > 0 ? (t > T_W1 + 300 ? Math.max(0, 1 - seg(t, T_W1 + 300, T_W1 + 700)) : 1) : 0);
-        }
-        var bm = seg(t, T_W1 - 100, T_W1 + 350);
-        beam.setAttribute('points', '150,6 ' + q[0][0].toFixed(1) + ',' + q[0][1].toFixed(1) + ' ' + q[3][0].toFixed(1) + ',' + q[3][1].toFixed(1) + ' ' + q[2][0].toFixed(1) + ',' + q[2][1].toFixed(1) + ' ' + q[1][0].toFixed(1) + ',' + q[1][1].toFixed(1));
-        beam.setAttribute('opacity', (bm * (0.75 + 0.25 * Math.sin(t / 140))).toFixed(2));
-        var lp = back(seg(t, T_W1, T_W1 + 380));
-        loop.setAttribute('transform', 'translate(266 32) rotate(' + (((t - T_W1) / 4) % 360).toFixed(0) + ') scale(' + Math.max(0, lp).toFixed(3) + ')');
-        loop.setAttribute('opacity', t > T_W1 ? 1 : 0);
-        txt.setAttribute('transform', 'rotate(' + (-(((t - T_W1) / 4) % 360)).toFixed(0) + ')');
-      }
-    };
-  }
-};
-
-
-function kindOf(f) {
-  var n = (f.name || '').toLowerCase(), t = f.type || '';
-  if (/\.(ttf|otf|woff2?)$/.test(n)) return null;
-  if (t.indexOf('video/') === 0 || /\.(mp4|m4v|mov|webm|ogv|mkv)$/.test(n)) return 'video';
-  if (t.indexOf('image/') === 0 || /\.(jpe?g|png|webp|gif|bmp|avif|heic|heif|tiff?)$/.test(n)) return 'image';
-  return null;
-}
-function go(list) {
-  var a = Array.prototype.slice.call(list || []).filter(function (f) { return kindOf(f); });
-  if (a.length) play(a[0], kindOf(a[0]), a.length - 1);
-}
-document.addEventListener('change', function (e) { if (e.target && e.target.id === 'file') go(e.target.files); }, true);
-document.addEventListener('drop', function (e) { if (e.dataTransfer) go(e.dataTransfer.files); }, true);
-
-})();
-
 </script>
 </body>
 </html>
